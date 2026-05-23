@@ -83,7 +83,7 @@ const Navigation = (props: Props) => {
 
   const primaryNavLinks: NavLinkItem[] = currentUser
     ? [homeNavLink, toolsNavLink, exploreNavLink, attachmentsNavLink, inboxNavLink]
-    : [exploreNavLink, aboutNavLink, signInNavLink];
+    : [toolsNavLink, exploreNavLink, aboutNavLink, signInNavLink];
   const inboxAriaLabel = unreadCount > 0 ? `${t("common.inbox")}, ${unreadCount} unread` : t("common.inbox");
 
   return (

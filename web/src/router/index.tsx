@@ -88,7 +88,6 @@ export const routeConfig: RouteObject[] = [
               },
               { path: Routes.ABOUT, element: <About /> },
               { path: Routes.EXPLORE, element: <Explore /> },
-              { path: Routes.TOOLS, element: <Tools /> },
               { path: "u/:username", element: <UserProfile /> },
               {
                 element: <RequireAuthRoute />,
@@ -99,6 +98,7 @@ export const routeConfig: RouteObject[] = [
               },
             ],
           },
+          { path: Routes.TOOLS, element: <Tools /> },
           { path: "memos/:uid", element: <MemoDetail /> },
           { path: "memos/shares/:token", element: <MemoDetail /> },
           {
