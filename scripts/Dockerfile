@@ -4,6 +4,9 @@ WORKDIR /backend-build
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates
 
+# 使用国内 Go 代理加速依赖下载（七牛云 goproxy.cn 是国内最常用的）
+ENV GOPROXY=https://goproxy.cn,direct
+
 # Copy go mod files and download dependencies (cached layer)
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
