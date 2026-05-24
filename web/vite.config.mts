@@ -16,7 +16,13 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 3001,
+    allowedHosts: ["memos.tunnel.meetmonth.top"],
     proxy: {
+      "^/api/v1/ws": {
+        target: devProxyServer,
+        xfwd: true,
+        ws: true,
+      },
       "^/api/v1/sse": {
         target: devProxyServer,
         xfwd: true,
