@@ -16,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/usememos/memos/internal/profile"
+	"github.com/usememos/memos/internal/webrtc"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	apiv1 "github.com/usememos/memos/server/router/api/v1"
 	"github.com/usememos/memos/server/router/fileserver"
@@ -94,6 +95,9 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 		return nil, errors.Wrap(err, "failed to create MCP service")
 	}
 	mcpService.RegisterRoutes(echoServer)
+
+	webrtcHub := webrtc.NewHub()
+	apiv1.RegisterWebRTCSignalRoute(echoServer, webrtcHub)
 
 	return s, nil
 }
