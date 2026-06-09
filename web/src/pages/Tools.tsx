@@ -1,4 +1,4 @@
-import { ArrowLeftRightIcon, WrenchIcon } from "lucide-react";
+import { ArrowLeftRightIcon, BinaryIcon, WrenchIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import MobileHeader from "@/components/MobileHeader";
 import useMediaQuery from "@/hooks/useMediaQuery";
@@ -17,12 +17,12 @@ const Tools = () => {
       icon: ArrowLeftRightIcon,
       to: Routes.FILE_TRANSFER,
     },
-    // {
-    //   title: "Base64编解码",
-    //   description: "对输入内容进行Base64编码或者解码",
-    //   icon: BinaryIcon,
-    //   to: Routes.TOOLS,
-    // },
+    {
+      title: t("base64.title"),
+      description: t("base64.description"),
+      icon: BinaryIcon,
+      to: Routes.BASE64,
+    },
   ];
 
   return (

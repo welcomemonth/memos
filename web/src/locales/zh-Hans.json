@@ -747,5 +747,28 @@
     "connecting": "连接中...",
     "connected": "已连接",
     "disconnected": "已断开"
+  },
+  "base64": {
+    "title": "Base64 编解码",
+    "description": "对文本内容进行 Base64 编码或解码",
+    "encode": "编码",
+    "decode": "解码",
+    "input-text": "输入文本",
+    "input-base64": "输入 Base64 字符串",
+    "input-placeholder-encode": "输入要编码的文本...",
+    "input-placeholder-decode": "输入要解码的 Base64 字符串...",
+    "output-base64": "Base64 编码结果",
+    "output-text": "解码结果",
+    "output-placeholder-encode": "编码结果将显示在这里",
+    "output-placeholder-decode": "解码结果将显示在这里",
+    "swap": "交换",
+    "copy": "复制",
+    "clear": "清空",
+    "copied": "已复制到剪贴板",
+    "empty-input": "请输入内容",
+    "empty-output": "没有可复制的内容",
+    "encode-failed": "编码失败，请检查输入内容",
+    "decode-failed": "解码失败，请输入有效的 Base64 字符串",
+    "back": "返回上一页"
   }
 }

@@ -857,5 +857,28 @@
     "connecting": "Connecting...",
     "connected": "Connected",
     "disconnected": "Disconnected"
+  },
+  "base64": {
+    "title": "Base64 Encoder/Decoder",
+    "description": "Encode or decode text with Base64",
+    "encode": "Encode",
+    "decode": "Decode",
+    "input-text": "Input Text",
+    "input-base64": "Input Base64 String",
+    "input-placeholder-encode": "Enter text to encode...",
+    "input-placeholder-decode": "Enter Base64 string to decode...",
+    "output-base64": "Base64 Encoded Result",
+    "output-text": "Decoded Result",
+    "output-placeholder-encode": "Encoded result will appear here",
+    "output-placeholder-decode": "Decoded result will appear here",
+    "swap": "Swap",
+    "copy": "Copy",
+    "clear": "Clear",
+    "copied": "Copied to clipboard",
+    "empty-input": "Please enter some content",
+    "empty-output": "Nothing to copy",
+    "encode-failed": "Encoding failed, please check your input",
+    "decode-failed": "Decoding failed, please enter a valid Base64 string",
+    "back": "Go back"
   }
 }
