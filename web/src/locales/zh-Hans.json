@@ -769,6 +769,24 @@
     "empty-output": "没有可复制的内容",
     "encode-failed": "编码失败，请检查输入内容",
     "decode-failed": "解码失败，请输入有效的 Base64 字符串",
-    "back": "返回上一页"
+    "back": "返回上一页",
+    "image": "图片",
+    "not-an-image": "请选择图片文件",
+    "image-too-large": "图片大小不能超过 10MB",
+    "image-read-failed": "图片读取失败",
+    "image-preview": "图片预览",
+    "remove-image": "移除",
+    "drop-image-here": "点击或拖拽图片到此处",
+    "drop-image-hint": "支持 PNG、JPG、GIF、WebP 等格式，最大 10MB",
+    "select-image": "选择图片",
+    "image-base64-result": "Base64 编码结果",
+    "base64-length": "长度",
+    "principle-title": "Base64 原理讲解",
+    "principle-what-title": "什么是 Base64？",
+    "principle-what-desc": "Base64 是一种基于 64 个可打印字符来表示二进制数据的编码方式。它将每 3 个字节（24 位）的二进制数据拆分为 4 组 6 位，每组映射到 64 个字符集（A-Z、a-z、0-9、+、/），从而将不可打印的二进制数据转换为纯文本。由于每 3 字节被编码为 4 字符，数据量会增加约 33%。",
+    "principle-why-title": "为什么要用 Base64？",
+    "principle-why-desc": "许多传输协议和存储系统只支持文本，无法直接处理二进制数据。例如：\n• 在 JSON/XML 中嵌入图片或文件\n• 在 HTML/CSS 中内联图片（Data URL）\n• 在电子邮件（MIME）中发送附件\n• 在 URL 参数中传递二进制数据\n• 在数据库中存储小型二进制对象\nBase64 确保了数据在传输过程中的完整性和兼容性。",
+    "principle-how-title": "编码原理详解",
+    "principle-how-desc": "1. 将原始字节流每 3 字节为一组\n2. 将 24 位平分为 4 个 6 位的组\n3. 每个 6 位值（0-63）映射到 Base64 字符表\n4. 若最后一组不足 3 字节，用 = 号填充\n\n例如：\"Man\" → TWFu\n• M(77) → 01001101, a(97) → 01100001, n(110) → 01101110\n• 合为 24 位，拆为 4×6 位 → 19(T), 22(W), 5(F), 46(u)\n\n这就是 Base64 名称的由来——64 个可用字符。"
   }
 }

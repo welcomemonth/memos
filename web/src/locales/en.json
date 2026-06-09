@@ -879,6 +879,24 @@
     "empty-output": "Nothing to copy",
     "encode-failed": "Encoding failed, please check your input",
     "decode-failed": "Decoding failed, please enter a valid Base64 string",
-    "back": "Go back"
+    "back": "Go back",
+    "image": "Image",
+    "not-an-image": "Please select an image file",
+    "image-too-large": "Image size must not exceed 10MB",
+    "image-read-failed": "Failed to read image",
+    "image-preview": "Image preview",
+    "remove-image": "Remove",
+    "drop-image-here": "Click or drag an image here",
+    "drop-image-hint": "Supports PNG, JPG, GIF, WebP, max 10MB",
+    "select-image": "Select Image",
+    "image-base64-result": "Base64 Encoded Result",
+    "base64-length": "Length",
+    "principle-title": "Base64 Principles",
+    "principle-what-title": "What is Base64?",
+    "principle-what-desc": "Base64 is an encoding scheme that represents binary data using 64 printable ASCII characters. It splits every 3 bytes (24 bits) of binary data into 4 groups of 6 bits, mapping each group to one of 64 characters (A-Z, a-z, 0-9, +, /), thereby converting non-printable binary data into plain text. Since every 3 bytes becomes 4 characters, the data size increases by approximately 33%.",
+    "principle-why-title": "Why use Base64?",
+    "principle-why-desc": "Many transport protocols and storage systems only support text and cannot directly handle binary data. For example:\n• Embedding images or files in JSON/XML\n• Inlining images in HTML/CSS (Data URL)\n• Sending attachments in email (MIME)\n• Passing binary data in URL parameters\n• Storing small binary objects in databases\nBase64 ensures data integrity and compatibility during transmission.",
+    "principle-how-title": "How Encoding Works",
+    "principle-how-desc": "1. Divide the raw byte stream into groups of 3 bytes\n2. Split 24 bits into 4 groups of 6 bits each\n3. Map each 6-bit value (0-63) to the Base64 character table\n4. If the last group has fewer than 3 bytes, pad with = signs\n\nExample: \"Man\" → TWFu\n• M(77) → 01001101, a(97) → 01100001, n(110) → 01101110\n• Combined as 24 bits, split into 4×6 bits → 19(T), 22(W), 5(F), 46(u)\n\nThis is why it's called Base64 — 64 available characters."
   }
 }
