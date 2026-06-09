@@ -18,6 +18,11 @@ export default defineConfig({
     port: 3001,
     allowedHosts: ["memos.tunnel.meetmonth.top"],
     proxy: {
+      "^/api/v1/webrtc/signal": {
+        target: devProxyServer,
+        xfwd: true,
+        ws: true,
+      },
       "^/api/v1/ws": {
         target: devProxyServer,
         xfwd: true,

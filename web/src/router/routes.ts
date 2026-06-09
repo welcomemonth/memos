@@ -10,6 +10,7 @@ export const ROUTES = {
   AUTH: "/auth",
   SHARED_MEMO: "/memos/shares",
   TOOLS: "/tools",
+  FILE_TRANSFER: "/tools/file-transfer",
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;

@@ -41,6 +41,7 @@ const SignIn = lazyWithReload(() => import("@/pages/SignIn"));
 const SignUp = lazyWithReload(() => import("@/pages/SignUp"));
 const Tools = lazyWithReload(() => import("@/pages/Tools"));
 const UserProfile = lazyWithReload(() => import("@/pages/UserProfile"));
+const FileTransfer = lazyWithReload(() => import("@/pages/FileTransfer"));
 
 // Backward compatibility alias.
 export const Routes = ROUTES;
@@ -99,6 +100,7 @@ export const routeConfig: RouteObject[] = [
             ],
           },
           { path: Routes.TOOLS, element: <Tools /> },
+          { path: Routes.FILE_TRANSFER, element: <FileTransfer /> },
           { path: "memos/:uid", element: <MemoDetail /> },
           { path: "memos/shares/:token", element: <MemoDetail /> },
           {
