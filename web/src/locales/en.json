@@ -898,5 +898,29 @@
     "principle-why-desc": "Many transport protocols and storage systems only support text and cannot directly handle binary data. For example:\n• Embedding images or files in JSON/XML\n• Inlining images in HTML/CSS (Data URL)\n• Sending attachments in email (MIME)\n• Passing binary data in URL parameters\n• Storing small binary objects in databases\nBase64 ensures data integrity and compatibility during transmission.",
     "principle-how-title": "How Encoding Works",
     "principle-how-desc": "1. Divide the raw byte stream into groups of 3 bytes\n2. Split 24 bits into 4 groups of 6 bits each\n3. Map each 6-bit value (0-63) to the Base64 character table\n4. If the last group has fewer than 3 bytes, pad with = signs\n\nExample: \"Man\" → TWFu\n• M(77) → 01001101, a(97) → 01100001, n(110) → 01101110\n• Combined as 24 bits, split into 4×6 bits → 19(T), 22(W), 5(F), 46(u)\n\nThis is why it's called Base64 — 64 available characters."
+  },
+  "timestamp": {
+    "title": "Timestamp Converter",
+    "description": "Convert between Unix timestamps and human-readable datetime",
+    "back": "Go back",
+    "current-timestamp": "Current Timestamp",
+    "seconds": "Seconds",
+    "milliseconds": "Milliseconds",
+    "copy": "Copy",
+    "copied": "Copied to clipboard",
+    "timestamp-to-datetime": "Timestamp → Datetime",
+    "datetime-to-timestamp": "Datetime → Timestamp",
+    "enter-timestamp": "Enter timestamp...",
+    "convert": "Convert",
+    "invalid-timestamp": "Please enter a valid numeric timestamp",
+    "conversion-failed": "Conversion failed, please check your input",
+    "please-select-datetime": "Please select a date and time",
+    "principle-title": "Understanding Unix Timestamps",
+    "principle-what-title": "What is a Unix Timestamp?",
+    "principle-what-desc": "A Unix timestamp is an integer representing the number of seconds (or milliseconds) elapsed since January 1, 1970 00:00:00 UTC — the Unix epoch. It is timezone-agnostic: the same moment yields the same timestamp regardless of where you are on Earth.\n\n10 digits = second precision (e.g., 1733760000)\n13 digits = millisecond precision (e.g., 1733760000000)",
+    "principle-why-title": "Why Use Timestamps?",
+    "principle-why-desc": "Timestamps are widely adopted because they elegantly solve two core pain points of date-time handling:\n\n• Timezone consistency — 2024-12-09 15:30 Beijing and 2024-12-09 02:30 New York are the same timestamp; no ambiguity\n• Easy computation — comparing two moments is a simple integer comparison; finding a duration is a simple subtraction\n• Compact storage — a single integer precisely represents a moment, more efficient than string storage\n• Sort-friendly — integer indexing and sorting in databases is vastly more performant than string-based date comparison\n\nThese properties make timestamps ubiquitous in database storage, API communication, logging, and cache expiration.",
+    "principle-issue-title": "The Year 2038 Problem",
+    "principle-issue-desc": "The maximum value of a 32-bit signed integer is 2,147,483,647 (2³¹ − 1), which corresponds to January 19, 2038 03:14:07 UTC. Beyond this moment, timestamps on 32-bit systems would overflow into negative values, causing time calculation errors — known as the \"Year 2038 problem,\" analogous to the Y2K bug.\n\nFortunately, most modern systems have already migrated to 64-bit integers for storing timestamps, which will last far beyond the lifespan of the universe. Most programming languages (including JavaScript, Python 3, Go, Java 8+, and Rust) use 64-bit or arbitrary-precision integers, making the 2038 problem irrelevant for them."
   }
 }

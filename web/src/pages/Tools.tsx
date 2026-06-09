@@ -1,4 +1,4 @@
-import { ArrowLeftRightIcon, BinaryIcon, WrenchIcon } from "lucide-react";
+import { ArrowLeftRightIcon, BinaryIcon, ClockIcon, WrenchIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import MobileHeader from "@/components/MobileHeader";
 import useMediaQuery from "@/hooks/useMediaQuery";
@@ -22,6 +22,12 @@ const Tools = () => {
       description: t("base64.description"),
       icon: BinaryIcon,
       to: Routes.BASE64,
+    },
+    {
+      title: t("timestamp.title"),
+      description: t("timestamp.description"),
+      icon: ClockIcon,
+      to: Routes.TIMESTAMP,
     },
   ];
 
