@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeftRightIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeftRightIcon, ArrowLeftIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import copy from "copy-to-clipboard";
 import { usePeerConnection } from "@/hooks/usePeerConnection";
@@ -23,6 +24,7 @@ function formatFileSize(bytes: number): string {
 const FileTransfer = () => {
   const t = useTranslate();
   const md = useMediaQuery("md");
+  const navigate = useNavigate();
 
   const signaling = useSignaling();
   const { status: wsStatus, roomCode } = signaling;
@@ -217,7 +219,13 @@ const FileTransfer = () => {
           <div className="w-full px-4 py-4 border-b border-border">
             <div className="w-full flex flex-row items-center justify-between">
               <div className="flex flex-row items-center gap-2">
-                <ArrowLeftRightIcon className="w-5 h-auto text-muted-foreground" />
+                <button
+                  onClick={() => navigate(-1)}
+                  className="inline-flex items-center justify-center rounded-md hover:bg-muted transition-colors p-1"
+                  aria-label="返回上一页"
+                >
+                  <ArrowLeftIcon className="w-5 h-auto text-muted-foreground" />
+                </button>
                 <h1 className="text-xl font-semibold">{t("file-transfer.title")}</h1>
               </div>
               <div className="flex flex-row items-center gap-1.5">
