@@ -1,7 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeftIcon,
   CopyIcon,
   Trash2Icon,
   ArrowUpDownIcon,
@@ -13,6 +11,7 @@ import {
 import toast from "react-hot-toast";
 import copy from "copy-to-clipboard";
 import MobileHeader from "@/components/MobileHeader";
+import BackButton from "@/components/BackButton";
 import { Button } from "@/components/ui/button";
 import useMediaQuery from "@/hooks/useMediaQuery";
 import { useTranslate } from "@/utils/i18n";
@@ -27,7 +26,6 @@ const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
 const Base64Tool = () => {
   const t = useTranslate();
   const md = useMediaQuery("md");
-  const navigate = useNavigate();
 
   const [mode, setMode] = useState<Mode>("encode");
   const [input, setInput] = useState("");
@@ -181,13 +179,7 @@ const Base64Tool = () => {
           <div className="w-full px-4 py-4 border-b border-border bg-muted/20">
             <div className="w-full flex flex-row items-center justify-between gap-3">
               <div className="flex flex-row items-center gap-2 min-w-0">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="inline-flex items-center justify-center rounded-md hover:bg-muted transition-colors p-1 shrink-0"
-                  aria-label={bt("back")}
-                >
-                  <ArrowLeftIcon className="w-5 h-auto text-muted-foreground" />
-                </button>
+                <BackButton /> 
                 <h1 className="text-xl font-semibold truncate">{bt("title")}</h1>
               </div>
               {/* 模式切换 */}

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeftIcon, CopyIcon, RefreshCwIcon, ClockIcon } from "lucide-react";
+import { CopyIcon, RefreshCwIcon, ClockIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import copy from "copy-to-clipboard";
 import MobileHeader from "@/components/MobileHeader";
 import { Button } from "@/components/ui/button";
-import useMediaQuery from "@/hooks/useMediaQuery";
+import BackButton from "@/components/BackButton";
+import useMediaQuery from "@/hooks/useMediaQuery";  
 import { useTranslate } from "@/utils/i18n";
 
 // —— 常用时区列表 ——
@@ -85,7 +85,6 @@ function datetimeToTimestamp(dateTimeLocalStr: string, timeZone: string): number
 const TimestampTool = () => {
   const t = useTranslate();
   const md = useMediaQuery("md");
-  const navigate = useNavigate();
 
   const bt = useCallback((key: string) => t(`timestamp.${key}` as any), [t]);
 
@@ -162,13 +161,7 @@ const TimestampTool = () => {
           {/* 标题栏 */}
           <div className="w-full px-4 py-4 border-b border-border bg-muted/20">
             <div className="w-full flex flex-row items-center gap-2">
-              <button
-                onClick={() => navigate(-1)}
-                className="inline-flex items-center justify-center rounded-md hover:bg-muted transition-colors p-1 shrink-0"
-                aria-label={bt("back")}
-              >
-                <ArrowLeftIcon className="w-5 h-auto text-muted-foreground" />
-              </button>
+              <BackButton /> 
               <h1 className="text-xl font-semibold truncate">{bt("title")}</h1>
             </div>
           </div>
