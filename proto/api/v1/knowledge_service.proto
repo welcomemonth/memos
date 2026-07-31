@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package memos.api.v1;
+
+import "google/api/annotations.proto"; // 定义 HTTP 路由（POST/GET/DELETE 等）
+import "google/api/client.proto"; //
+import "google/api/field_behavior.proto"; // 标记字段是否必填（REQUIRED）、只读（OUTPUT_ONLY）
+import "google/api/resource.proto";
+import "google/protobuf/empty.proto"; //空返回值（删除接口用）
+import "google/protobuf/field_mask.proto"; //部分更新（只更新指定字段）
+import "google/protobuf/timestamp.proto"; //时间戳类型
+
+option go_package = "gen/api/v1"; // 生成的go代码放在这个目录下
+
+// 一组相关的api方法
+service KnowledgeService {
+  // rpc一个具体的接口方法 方法名 入参和返回值类型
+  rpc CreateKnowledgeBase(CreateKnowledgeBaseRequest) returns (KnowledgeBase) {
+    //  定义这个接口对应的 HTTP 路由
+    option (google.api.http) = {
+      post: "/api/v1/knowledgebases" // HTTP POST 请求到 /api/v1/knowledgebases
+      body: "knowledge_base" // 请求体是 request 中的 knowledge_base 字段
+    };
+  }
+  // 获取所有知识库
+  rpc ListKnowledgeBases(ListKnowledgeBasesRequest) returns (ListKnowledgeBasesResponse) {
+    option (google.api.http) = {get: "/api/v1/knowledgebases"};
+  }
+  // 获取单个知识库
+  rpc GetKnowledgeBase(GetKnowledgeBaseRequest) returns (KnowledgeBase) {
+    option (google.api.http) = {get: "/api/v1/{name=knowledgebases/*}"};
+  }
+  rpc UpdateKnowledgeBase(UpdateKnowledgeBaseRequest) returns (KnowledgeBase) {
+    option (google.api.http) = {
+      patch: "/api/v1/{knowledge_base.name=knowledgebases/*}"
+      // {knowledge_base.name=knowledgebases/*} 表示：
+      // 从 request.knowledge_base.name 中提取资源名
+      // URL 变成 /api/v1/knowledgebases/abc123
+      body: "knowledge_base"
+    };
+  }
+
+  rpc DeleteKnowledgeBase(DeleteKnowledgeBaseRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/{name=knowledgebases/*}"};
+  }
+
+  // 在 Document 中添加
+  rpc UploadDocument(UploadDocumentRequest) returns (Document) {
+    option (google.api.http) = {
+      post: "/api/v1/{parent=knowledgebases/*}/documents"
+      body: "*"
+    };
+  }
+
+  rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse) {
+    option (google.api.http) = {get: "/api/v1/{parent=knowledgebases/*}/documents"};
+  }
+
+  rpc DeleteDocument(DeleteDocumentRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/{name=knowledgebases/*/documents/*}"};
+  }
+}
+
+message KnowledgeBase {
+  string name = 1;
+  string title = 2 [(google.api.field_behavior) = REQUIRED];
+  string description = 3;
+  int32 document_count = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  // 添加时间戳
+  google.protobuf.Timestamp create_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message CreateKnowledgeBaseRequest {
+  KnowledgeBase knowledge_base = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message GetKnowledgeBaseRequest {
+  string name = 1; // knowledgebases/{uid}
+}
+
+message ListKnowledgeBasesRequest {
+  int32 page_size = 1; // 每页多少条
+  string page_token = 2; // 分页令牌（从上次响应获取）
+}
+
+message ListKnowledgeBasesResponse {
+  repeated KnowledgeBase knowledge_bases = 1; // repeated = 数组
+  string next_page_token = 2; // 下一页的令牌
+}
+
+// Request 结构
+message UpdateKnowledgeBaseRequest {
+  // 要更新的知识库（包含新值）
+  KnowledgeBase knowledge_base = 1 [(google.api.field_behavior) = REQUIRED];
+
+  // 指定要更新哪些字段
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteKnowledgeBaseRequest {
+  string name = 1; // knowledgebases/{uid}
+}
+
+// Document message
+message Document {
+  string name = 1;
+  string filename = 2;
+  int64 file_size = 3;
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PENDING = 1;
+    PROCESSING = 2;
+    READY = 3;
+    FAILED = 4;
+  }
+  Status status = 4;
+
+  string error_message = 5;
+  google.protobuf.Timestamp create_time = 6 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+// Request messages
+message UploadDocumentRequest {
+  string parent = 1; // knowledgebases/{uid}
+  bytes content = 2;
+  string filename = 3;
+}
+
+message ListDocumentsRequest {
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListDocumentsResponse {
+  repeated Document documents = 1;
+  string next_page_token = 2;
+}
+
+message DeleteDocumentRequest {
+  string name = 1; // knowledgebases/{kb_uid}/documents/{id}
+}
