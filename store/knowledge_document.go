@@ -1,6 +1,10 @@
 package store
 
-import "github.com/pkg/errors"
+import (
+	"context"
+
+	"github.com/pkg/errors"
+)
 
 type DocumentStatus string
 
@@ -47,4 +51,31 @@ type UpdateKBDocument struct {
 
 type DeleteKBDocument struct {
 	ID int32
+}
+
+func (s *Store) CreateKBDocument(ctx context.Context, create *KBDocument) (*KBDocument, error) {
+	return s.driver.CreateKBDocument(ctx, create)
+}
+
+func (s *Store) GetKBDocument(ctx context.Context, find *FindKBDocument) (*KBDocument, error) {
+	list, err := s.driver.ListKBDocuments(ctx, find)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, ErrDocumentNotFound
+	}
+	return list[0], nil
+}
+
+func (s *Store) ListKBDocuments(ctx context.Context, find *FindKBDocument) ([]*KBDocument, error) {
+	return s.driver.ListKBDocuments(ctx, find)
+}
+
+func (s *Store) UpdateKBDocument(ctx context.Context, update *UpdateKBDocument) error {
+	return s.driver.UpdateKBDocument(ctx, update)
+}
+
+func (s *Store) DeleteKBDocument(ctx context.Context, id int32) error {
+	return s.driver.DeleteKBDocument(ctx, &DeleteKBDocument{ID: id})
 }
