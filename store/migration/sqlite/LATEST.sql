@@ -124,3 +124,31 @@ CREATE TABLE user_identity (
 );
 
 CREATE INDEX idx_user_identity_user_id ON user_identity(user_id);
+
+-- knowledge_base
+CREATE TABLE knowledge_base (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT NOT NULL UNIQUE,
+  creator_id INTEGER NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+-- kb_document
+CREATE TABLE kb_document (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  knowledge_base_id INTEGER NOT NULL,
+  file_name TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  file_size INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL CHECK (status IN ('PENDING', 'PROCESSING', 'READY', 'FAILED')) DEFAULT 'PENDING',
+  error_message TEXT NOT NULL DEFAULT '',
+  created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_base(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_kb_document_knowledge_base_id ON kb_document(knowledge_base_id);
+CREATE INDEX idx_knowledge_base_creator_id ON knowledge_base(creator_id);
