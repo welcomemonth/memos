@@ -36,3 +36,5 @@ learn
 *.db*
 .claude
 server/router/frontend/dist/index.html
+
+Tutorial

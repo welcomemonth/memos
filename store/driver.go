@@ -81,4 +81,16 @@ type Driver interface {
 	CreateUserIdentity(ctx context.Context, create *UserIdentity) (*UserIdentity, error)
 	ListUserIdentities(ctx context.Context, find *FindUserIdentity) ([]*UserIdentity, error)
 	DeleteUserIdentities(ctx context.Context, delete *DeleteUserIdentity) error
+
+	// KnowledgeBase model related methods.
+	CreateKnowledgeBase(ctx context.Context, create *KnowledgeBase) (*KnowledgeBase, error)
+	ListKnowledgeBases(ctx context.Context, find *FindKnowledgeBase) ([]*KnowledgeBase, error)
+	UpdateKnowledgeBase(ctx context.Context, update *UpdateKnowledgeBase) error
+	DeleteKnowledgeBase(ctx context.Context, delete *DeleteKnowledgeBase) error
+
+	// KBDocument model related methods.
+	CreateKBDocument(ctx context.Context, create *KBDocument) (*KBDocument, error)
+	ListKBDocuments(ctx context.Context, find *FindKBDocument) ([]*KBDocument, error)
+	UpdateKBDocument(ctx context.Context, update *UpdateKBDocument) error
+	DeleteKBDocument(ctx context.Context, delete *DeleteKBDocument) error
 }

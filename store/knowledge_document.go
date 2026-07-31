@@ -1,6 +1,13 @@
 package store
 
+import "github.com/pkg/errors"
+
 type DocumentStatus string
+
+var (
+	ErrDocumentNotFound   = errors.New("document not found")
+	ErrDocumentProcessing = errors.New("document is still processing")
+)
 
 const (
 	DocumentStatusPending    DocumentStatus = "PENDING"
@@ -36,4 +43,8 @@ type UpdateKBDocument struct {
 	Status       *DocumentStatus
 	ErrorMessage *string
 	UpdatedTs    *int64
+}
+
+type DeleteKBDocument struct {
+	ID int32
 }
