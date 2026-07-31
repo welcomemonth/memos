@@ -605,6 +605,235 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/knowledgebases:
+        get:
+            tags:
+                - KnowledgeService
+            description: 获取所有知识库
+            operationId: KnowledgeService_ListKnowledgeBases
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListKnowledgeBasesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - KnowledgeService
+            description: rpc一个具体的接口方法 方法名 入参和返回值类型
+            operationId: KnowledgeService_CreateKnowledgeBase
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/KnowledgeBase'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/KnowledgeBase'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/knowledgebases/{knowledgebase}:
+        get:
+            tags:
+                - KnowledgeService
+            description: 获取单个知识库
+            operationId: KnowledgeService_GetKnowledgeBase
+            parameters:
+                - name: knowledgebase
+                  in: path
+                  description: The knowledgebase id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/KnowledgeBase'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - KnowledgeService
+            operationId: KnowledgeService_DeleteKnowledgeBase
+            parameters:
+                - name: knowledgebase
+                  in: path
+                  description: The knowledgebase id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - KnowledgeService
+            operationId: KnowledgeService_UpdateKnowledgeBase
+            parameters:
+                - name: knowledgebase
+                  in: path
+                  description: The knowledgebase id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: 指定要更新哪些字段
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/KnowledgeBase'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/KnowledgeBase'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/knowledgebases/{knowledgebase}/documents:
+        get:
+            tags:
+                - KnowledgeService
+            operationId: KnowledgeService_ListDocuments
+            parameters:
+                - name: knowledgebase
+                  in: path
+                  description: The knowledgebase id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListDocumentsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        post:
+            tags:
+                - KnowledgeService
+            description: 在 Document 中添加
+            operationId: KnowledgeService_UploadDocument
+            parameters:
+                - name: knowledgebase
+                  in: path
+                  description: The knowledgebase id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UploadDocumentRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Document'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/knowledgebases/{knowledgebase}/documents/{document}:
+        delete:
+            tags:
+                - KnowledgeService
+            operationId: KnowledgeService_DeleteDocument
+            parameters:
+                - name: knowledgebase
+                  in: path
+                  description: The knowledgebase id.
+                  required: true
+                  schema:
+                    type: string
+                - name: document
+                  in: path
+                  description: The document id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/memos:
         get:
             tags:
@@ -2616,6 +2845,31 @@ components:
                     description: |-
                         The actual token value - only returned on creation.
                          This is the only time the token value will be visible.
+        Document:
+            type: object
+            properties:
+                name:
+                    type: string
+                filename:
+                    type: string
+                fileSize:
+                    type: string
+                status:
+                    enum:
+                        - STATUS_UNSPECIFIED
+                        - PENDING
+                        - PROCESSING
+                        - READY
+                        - FAILED
+                    type: string
+                    format: enum
+                errorMessage:
+                    type: string
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+            description: Document message
         FieldMapping:
             type: object
             properties:
@@ -2928,6 +3182,30 @@ components:
                     type: string
                     description: size_bytes is the database size in bytes; -1 if unavailable.
             description: Database size statistics.
+        KnowledgeBase:
+            required:
+                - title
+            type: object
+            properties:
+                name:
+                    type: string
+                title:
+                    type: string
+                description:
+                    type: string
+                documentCount:
+                    readOnly: true
+                    type: integer
+                    format: int32
+                createTime:
+                    readOnly: true
+                    type: string
+                    description: 添加时间戳
+                    format: date-time
+                updateTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
         LinkMetadata:
             type: object
             properties:
@@ -2987,6 +3265,15 @@ components:
                     type: integer
                     description: The total count of attachments (may be approximate).
                     format: int32
+        ListDocumentsResponse:
+            type: object
+            properties:
+                documents:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/Document'
+                nextPageToken:
+                    type: string
         ListIdentityProvidersResponse:
             type: object
             properties:
@@ -2995,6 +3282,15 @@ components:
                     items:
                         $ref: '#/components/schemas/IdentityProvider'
                     description: The list of identity providers.
+        ListKnowledgeBasesResponse:
+            type: object
+            properties:
+                knowledgeBases:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/KnowledgeBase'
+                nextPageToken:
+                    type: string
         ListLinkedIdentitiesResponse:
             type: object
             properties:
@@ -3665,6 +3961,17 @@ components:
                 contentType:
                     type: string
                     description: Optional. The MIME type of the input audio.
+        UploadDocumentRequest:
+            type: object
+            properties:
+                parent:
+                    type: string
+                content:
+                    type: string
+                    format: bytes
+                filename:
+                    type: string
+            description: Request messages
         UpsertMemoReactionRequest:
             required:
                 - name
@@ -3980,6 +4287,8 @@ tags:
     - name: AuthService
     - name: IdentityProviderService
     - name: InstanceService
+    - name: KnowledgeService
+      description: 一组相关的api方法
     - name: MemoService
     - name: ShortcutService
     - name: UserService
