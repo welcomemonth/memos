@@ -6,6 +6,279 @@ info:
     title: ""
     version: 0.0.1
 paths:
+    /api/v1/ai/conversations:
+        get:
+            tags:
+                - AIConversationService
+            operationId: AIConversationService_ListConversations
+            parameters:
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListConversationsResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/conversations/ai/{ai}/*:
+        get:
+            tags:
+                - AIConversationService
+            operationId: AIConversationService_GetConversation
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AIConversation'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - AIConversationService
+            operationId: AIConversationService_DeleteConversation
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - AIConversationService
+            description: |-
+                UpdateConversation updates a conversation. Currently only the title field
+                 can be modified.
+            operationId: AIConversationService_UpdateConversation
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: Only "title" is currently updatable.
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AIConversation'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AIConversation'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/conversations/ai/{ai}/*/messages:
+        get:
+            tags:
+                - AIConversationService
+            description: ListMessages lists all messages in a conversation.
+            operationId: AIConversationService_ListMessages
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  schema:
+                    type: string
+                - name: afterMessage
+                  in: query
+                  description: 'Optional: only return messages after this message name.'
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMessagesResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/conversations/ai/{ai}/*:sendMessage:
+        post:
+            tags:
+                - AIConversationService
+            description: |-
+                SendMessage sends a user message and returns the assistant reply.
+
+                 If the conversation identified by `parent` does not exist, it will be
+                 created automatically. The response includes the (possibly new)
+                 conversation so the client can record the backend-assigned name.
+            operationId: AIConversationService_SendMessage
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SendMessageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SendMessageResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/conversations/ai/{ai}/*:streamMessage:
+        post:
+            tags:
+                - AIConversationService
+            description: |-
+                StreamMessage sends a user message and streams the assistant reply.
+
+                 If the conversation does not exist, a ConversationCreated event is
+                 emitted as the first frame before any content deltas.
+                 Uses Connect server-streaming.
+            operationId: AIConversationService_StreamMessage
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/StreamMessageRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/StreamMessageEvent'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/v1/ai/messages/ai/{ai}/*:
+        get:
+            tags:
+                - AIConversationService
+            operationId: AIConversationService_GetMessage
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AIMessage'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        delete:
+            tags:
+                - AIConversationService
+            operationId: AIConversationService_DeleteMessage
+            parameters:
+                - name: ai
+                  in: path
+                  description: The ai id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content: {}
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/ai:transcribe:
         post:
             tags:
@@ -2528,6 +2801,103 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
+        AIConversation:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: 'Resource name: ai/conversations/{uid}'
+                title:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        Title — auto-generated from the first user message, can be overridden
+                         via UpdateConversation.
+                model:
+                    type: string
+                    description: |-
+                        Default model for new messages in this conversation. Individual messages
+                         may override via SendMessageRequest.model.
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                updateTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+        AIMessage:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: 'Resource name: ai/messages/{uid}'
+                parent:
+                    readOnly: true
+                    type: string
+                    description: 'Parent conversation: ai/conversations/{uid}'
+                role:
+                    enum:
+                        - ROLE_UNSPECIFIED
+                        - USER
+                        - ASSISTANT
+                        - TOOL
+                        - SYSTEM
+                    type: string
+                    format: enum
+                status:
+                    enum:
+                        - STATUS_UNSPECIFIED
+                        - PENDING
+                        - COMPLETED
+                        - ERROR
+                        - CANCELLED
+                    type: string
+                    format: enum
+                content:
+                    type: string
+                    description: Main content (Markdown).
+                reasoningItems:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ReasoningItem'
+                    description: Reasoning / thinking segments.
+                toolCalls:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ToolCall'
+                    description: Tool calls made by the assistant in this message.
+                attachments:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MessageAttachment'
+                    description: Attached files (images, documents, etc.).
+                searchResults:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/SearchResult'
+                    description: Web search results referenced by the assistant.
+                model:
+                    type: string
+                    description: The model that actually produced this message.
+                parentMessage:
+                    type: string
+                    description: Parent message name (for branching / regeneration).
+                tokensUsed:
+                    type: integer
+                    description: Token usage.
+                    format: int32
+                errorMessage:
+                    type: string
+                    description: Error detail when status is ERROR.
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                updateTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
         Attachment:
             required:
                 - filename
@@ -2789,6 +3159,21 @@ components:
                      };
 
                      // ...
+        ContentDelta:
+            type: object
+            properties:
+                delta:
+                    type: string
+        ConversationCreated:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: 'The backend-assigned conversation resource name: ai/conversations/{uid}'
+                title:
+                    type: string
+                model:
+                    type: string
         CreateLinkedIdentityRequest:
             required:
                 - parent
@@ -3265,6 +3650,15 @@ components:
                     type: integer
                     description: The total count of attachments (may be approximate).
                     format: int32
+        ListConversationsResponse:
+            type: object
+            properties:
+                conversations:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AIConversation'
+                nextPageToken:
+                    type: string
         ListDocumentsResponse:
             type: object
             properties:
@@ -3372,6 +3766,15 @@ components:
                     description: |-
                         A token that can be sent as `page_token` to retrieve the next page.
                          If this field is omitted, there are no subsequent pages.
+        ListMessagesResponse:
+            type: object
+            properties:
+                messages:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AIMessage'
+                nextPageToken:
+                    type: string
         ListPersonalAccessTokensResponse:
             type: object
             properties:
@@ -3627,6 +4030,28 @@ components:
                     type: string
                     description: The title extracted from the first H1 heading, if present.
             description: Computed properties of a memo.
+        MessageAttachment:
+            type: object
+            properties:
+                name:
+                    type: string
+                filename:
+                    type: string
+                contentType:
+                    type: string
+                size:
+                    type: string
+                uri:
+                    type: string
+                type:
+                    enum:
+                        - ATTACHMENT_TYPE_UNSPECIFIED
+                        - IMAGE
+                        - FILE
+                        - VIDEO
+                        - AUDIO
+                    type: string
+                    format: enum
         MotionMedia:
             type: object
             properties:
@@ -3756,6 +4181,26 @@ components:
                     type: string
                     description: Output only. The creation timestamp.
                     format: date-time
+        ReasoningDelta:
+            type: object
+            properties:
+                delta:
+                    type: string
+        ReasoningItem:
+            type: object
+            properties:
+                content:
+                    type: string
+                durationMs:
+                    type: integer
+                    format: int32
+                tokens:
+                    type: integer
+                    format: int32
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
         RefreshTokenRequest:
             type: object
             properties: {}
@@ -3769,6 +4214,54 @@ components:
                     type: string
                     description: When the access token expires.
                     format: date-time
+        SearchResult:
+            type: object
+            properties:
+                title:
+                    type: string
+                uri:
+                    type: string
+                snippet:
+                    type: string
+                source:
+                    type: string
+        SendMessageRequest:
+            required:
+                - content
+            type: object
+            properties:
+                parent:
+                    type: string
+                    description: |-
+                        ai/conversations/{uid} — if the conversation does not exist it will be
+                         created automatically. The frontend generates a UUID for new conversations.
+                content:
+                    type: string
+                    description: The user message content (plain text or Markdown).
+                attachments:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MessageAttachment'
+                    description: 'Optional: files/images to attach.'
+                model:
+                    type: string
+                    description: |-
+                        Optional: model to use for this turn. Falls back to conversation.model
+                         when empty.
+                parentMessage:
+                    type: string
+                    description: 'Optional: parent message name (for branching / regeneration).'
+        SendMessageResponse:
+            type: object
+            properties:
+                message:
+                    $ref: '#/components/schemas/AIMessage'
+                conversation:
+                    $ref: '#/components/schemas/AIConversation'
+            description: |-
+                SendMessageResponse returns both the assistant reply and the conversation
+                 it belongs to. This way the client always learns the backend-assigned
+                 conversation name, even when the conversation was just created.
         SetMemoAttachmentsRequest:
             required:
                 - name
@@ -3918,6 +4411,82 @@ components:
             description: |-
                 S3 configuration for cloud storage backend.
                  Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/
+        StreamDone:
+            type: object
+            properties:
+                messageName:
+                    type: string
+                    description: 'The completed assistant message resource name: ai/messages/{uid}'
+                tokensUsed:
+                    type: integer
+                    format: int32
+                model:
+                    type: string
+        StreamError:
+            type: object
+            properties:
+                message:
+                    type: string
+                code:
+                    type: string
+        StreamMessageEvent:
+            type: object
+            properties:
+                conversationCreated:
+                    allOf:
+                        - $ref: '#/components/schemas/ConversationCreated'
+                    description: |-
+                        Emitted when a new conversation is auto-created (always the first
+                         event if the conversation did not previously exist).
+                reasoning:
+                    allOf:
+                        - $ref: '#/components/schemas/ReasoningDelta'
+                    description: A delta of the assistant's reasoning/thinking output.
+                content:
+                    allOf:
+                        - $ref: '#/components/schemas/ContentDelta'
+                    description: A delta of the assistant's main content.
+                toolCallStart:
+                    allOf:
+                        - $ref: '#/components/schemas/ToolCallStart'
+                    description: A tool call is starting.
+                toolCallDelta:
+                    allOf:
+                        - $ref: '#/components/schemas/ToolCallDelta'
+                    description: A delta of a tool call's arguments (streaming JSON).
+                toolCallEnd:
+                    allOf:
+                        - $ref: '#/components/schemas/ToolCallEnd'
+                    description: A tool call has finished with its result.
+                done:
+                    allOf:
+                        - $ref: '#/components/schemas/StreamDone'
+                    description: The stream is complete; includes final message metadata.
+                error:
+                    allOf:
+                        - $ref: '#/components/schemas/StreamError'
+                    description: An error occurred during streaming.
+            description: |-
+                StreamMessageEvent is one frame in the server-streaming response.
+                 Exactly one of the fields below will be set per event.
+        StreamMessageRequest:
+            required:
+                - content
+            type: object
+            properties:
+                parent:
+                    type: string
+                    description: Same semantics as SendMessageRequest.parent.
+                content:
+                    type: string
+                attachments:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MessageAttachment'
+                model:
+                    type: string
+                parentMessage:
+                    type: string
         TestInstanceEmailSettingRequest:
             type: object
             properties:
@@ -3929,6 +4498,74 @@ components:
                     type: string
                     description: Optional. Recipient email address. If omitted, the current user's email address is used.
             description: Request message for TestInstanceEmailSetting method.
+        ToolCall:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                arguments:
+                    type: string
+                result:
+                    type: string
+                status:
+                    enum:
+                        - TOOL_CALL_STATUS_UNSPECIFIED
+                        - TOOL_CALL_PENDING
+                        - TOOL_CALL_RUNNING
+                        - TOOL_CALL_COMPLETED
+                        - TOOL_CALL_FAILED
+                    type: string
+                    format: enum
+                durationMs:
+                    type: integer
+                    format: int32
+                errorMessage:
+                    type: string
+                createTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+                updateTime:
+                    readOnly: true
+                    type: string
+                    format: date-time
+        ToolCallDelta:
+            type: object
+            properties:
+                toolCallId:
+                    type: string
+                argumentsDelta:
+                    type: string
+        ToolCallEnd:
+            type: object
+            properties:
+                toolCallId:
+                    type: string
+                result:
+                    type: string
+                status:
+                    enum:
+                        - TOOL_CALL_STATUS_UNSPECIFIED
+                        - TOOL_CALL_PENDING
+                        - TOOL_CALL_RUNNING
+                        - TOOL_CALL_COMPLETED
+                        - TOOL_CALL_FAILED
+                    type: string
+                    format: enum
+                errorMessage:
+                    type: string
+                durationMs:
+                    type: integer
+                    format: int32
+        ToolCallStart:
+            type: object
+            properties:
+                toolCallId:
+                    type: string
+                name:
+                    type: string
         TranscribeRequest:
             required:
                 - audio
@@ -4282,6 +4919,14 @@ components:
                     format: date-time
             description: UserWebhook represents a webhook owned by a user.
 tags:
+    - name: AIConversationService
+      description: |-
+        AIConversationService provides APIs for managing AI chat conversations and messages.
+
+         Conversations are lazily created: the first SendMessage / StreamMessage call
+         with a new parent name will auto-create the conversation. There is no
+         explicit CreateConversation API. The conversation title is auto-generated
+         from the first user message; it can be overridden via UpdateConversation.
     - name: AIService
     - name: AttachmentService
     - name: AuthService
