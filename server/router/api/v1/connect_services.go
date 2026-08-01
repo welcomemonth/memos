@@ -670,3 +670,69 @@ func (s *ConnectServiceHandler) StreamMessage(ctx context.Context, req *connect.
 	// This requires converting between connect.ServerStream and grpc.ServerStreamingServer
 	return nil
 }
+
+// KnowledgeService
+
+func (s *ConnectServiceHandler) CreateKnowledgeBase(ctx context.Context, req *connect.Request[v1pb.CreateKnowledgeBaseRequest]) (*connect.Response[v1pb.KnowledgeBase], error) {
+	resp, err := s.APIV1Service.CreateKnowledgeBase(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ListKnowledgeBases(ctx context.Context, req *connect.Request[v1pb.ListKnowledgeBasesRequest]) (*connect.Response[v1pb.ListKnowledgeBasesResponse], error) {
+	resp, err := s.APIV1Service.ListKnowledgeBases(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) GetKnowledgeBase(ctx context.Context, req *connect.Request[v1pb.GetKnowledgeBaseRequest]) (*connect.Response[v1pb.KnowledgeBase], error) {
+	resp, err := s.APIV1Service.GetKnowledgeBase(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) UpdateKnowledgeBase(ctx context.Context, req *connect.Request[v1pb.UpdateKnowledgeBaseRequest]) (*connect.Response[v1pb.KnowledgeBase], error) {
+	resp, err := s.APIV1Service.UpdateKnowledgeBase(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) DeleteKnowledgeBase(ctx context.Context, req *connect.Request[v1pb.DeleteKnowledgeBaseRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.DeleteKnowledgeBase(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) UploadDocument(ctx context.Context, req *connect.Request[v1pb.UploadDocumentRequest]) (*connect.Response[v1pb.Document], error) {
+	resp, err := s.APIV1Service.UploadDocument(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ListDocuments(ctx context.Context, req *connect.Request[v1pb.ListDocumentsRequest]) (*connect.Response[v1pb.ListDocumentsResponse], error) {
+	resp, err := s.APIV1Service.ListDocuments(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) DeleteDocument(ctx context.Context, req *connect.Request[v1pb.DeleteDocumentRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.DeleteDocument(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
