@@ -2,6 +2,7 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -448,7 +449,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 			Event: &v1pb.StreamMessageEvent_ConversationCreated{
 				ConversationCreated: &v1pb.ConversationCreated{
 					Name:  "ai/conversations/" + conv.UID,
-					Title: conv.Title,
+					Title: request.Content,
 					Model: conv.Model,
 				},
 			},
@@ -528,6 +529,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 
 	// ===== 7. 逐 chunk 推送给前端 =====
 	var fullContent string
+	var fullReasoning string
 	for {
 		chunk, recvErr := streamReader.Recv()
 
@@ -558,6 +560,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 
 		// 推送 reasoning（思考过程）
 		if msg.ReasoningContent != "" {
+			fullReasoning += msg.ReasoningContent
 			if sendErr := stream.Send(&v1pb.StreamMessageEvent{
 				Event: &v1pb.StreamMessageEvent_Reasoning{
 					Reasoning: &v1pb.ReasoningDelta{Delta: msg.ReasoningContent},
@@ -582,11 +585,33 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 
 	// ===== 8. 流结束 → 更新 DB 中的 assistant message =====
-	if err := s.Store.UpdateAIMessage(ctx, &store.UpdateAIMessage{
+	// 如果有 reasoning，构建 Payload JSON
+	var payloadStr string
+	if fullReasoning != "" {
+		// 构建 reasoning_items JSON
+		payload := map[string]any{
+			"reasoning_items": []map[string]any{
+				{
+					"content":     fullReasoning,
+					"duration_ms": 0,
+					"tokens":      0,
+				},
+			},
+		}
+		if b, err := json.Marshal(payload); err == nil {
+			payloadStr = string(b)
+		}
+	}
+
+	updateMsg := &store.UpdateAIMessage{
 		ID:      assistantMsg.ID,
 		Status:  ptrStatus(store.AIMessageStatusCompleted),
 		Content: &fullContent,
-	}); err != nil {
+	}
+	if payloadStr != "" {
+		updateMsg.Payload = &payloadStr
+	}
+	if err := s.Store.UpdateAIMessage(ctx, updateMsg); err != nil {
 		slog.Error("failed to update assistant message", "err", err)
 	}
 
@@ -635,7 +660,7 @@ func convertConversationToPb(c *store.AIConversation) *v1pb.AIConversation {
 }
 
 func convertMessageToPb(m *store.AIMessage, convUID string) *v1pb.AIMessage {
-	return &v1pb.AIMessage{
+	msg := &v1pb.AIMessage{
 		Name:          "ai/messages/" + m.UID,
 		Parent:        "ai/conversations/" + convUID,
 		Role:          convertMessageRole(m.Role),
@@ -647,8 +672,33 @@ func convertMessageToPb(m *store.AIMessage, convUID string) *v1pb.AIMessage {
 		ErrorMessage:  m.ErrorMessage,
 		CreateTime:    timestamppb.New(time.Unix(m.CreatedTs, 0)),
 		UpdateTime:    timestamppb.New(time.Unix(m.UpdatedTs, 0)),
-		// TODO: parse payload JSON to populate reasoning_items, tool_calls, attachments, search_results
 	}
+
+	// 解析 Payload JSON，填充 reasoning_items
+	if m.Payload != "" && m.Payload != "{}" {
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(m.Payload), &payload); err == nil {
+			if items, ok := payload["reasoning_items"].([]any); ok {
+				for _, item := range items {
+					if itemMap, ok := item.(map[string]any); ok {
+						ri := &v1pb.ReasoningItem{}
+						if content, ok := itemMap["content"].(string); ok {
+							ri.Content = content
+						}
+						if durationMs, ok := itemMap["duration_ms"].(float64); ok {
+							ri.DurationMs = int32(durationMs)
+						}
+						if tokens, ok := itemMap["tokens"].(float64); ok {
+							ri.Tokens = int32(tokens)
+						}
+						msg.ReasoningItems = append(msg.ReasoningItems, ri)
+					}
+				}
+			}
+		}
+	}
+
+	return msg
 }
 
 func convertMessageRole(role store.AIMessageRole) v1pb.AIMessage_Role {

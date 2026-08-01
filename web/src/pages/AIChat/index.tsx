@@ -34,12 +34,14 @@ const toLocalMessage = (apiMsg: {
   role: number;
   content: string;
   model?: string;
+  reasoningItems?: Array<{ content: string }>;
   createTime?: { seconds: bigint };
 }): ChatMessage => ({
   id: apiMsg.name,
   role: apiMsg.role === AIMessage_Role.USER ? "user" : "assistant",
   content: apiMsg.content,
   model: apiMsg.model,
+  reasoning: apiMsg.reasoningItems?.map((r) => r.content).filter(Boolean).join("\n\n") || undefined,
   timestamp: apiMsg.createTime ? Number(apiMsg.createTime.seconds) * 1000 : Date.now(),
 });
 
@@ -55,12 +57,27 @@ const AIChat = () => {
   // Track the currently streaming conversation to avoid stale closures
   const streamingConvIdRef = useRef<string>("");
 
-  // Load conversations from API
+  // Load conversations from API, preserving locally-held messages (optimistic user
+  // messages added during streaming) and local-only conversations that haven't
+  // synced to the server yet.
   const loadConversations = useCallback(async () => {
     try {
       const list = await listConversations();
       const mapped = list.map(toLocalConversation);
-      setConversations(mapped);
+      setConversations((prev) => {
+        const prevById = new Map(prev.map((c) => [c.id, c]));
+        const updated = mapped.map((c) => {
+          const local = prevById.get(c.id);
+          if (local) {
+            prevById.delete(c.id);
+            return { ...c, messages: local.messages };
+          }
+          return c;
+        });
+        // Keep local-only conversations (e.g., just-created during streaming)
+        const localOnly = Array.from(prevById.values());
+        return [...updated, ...localOnly];
+      });
     } catch (err) {
       console.error("Failed to load conversations:", err);
     }
