@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   listConversations,
   listMessages,
-  sendMessage,
+  streamMessage,
   deleteConversation,
   generateConversationId,
   type AIConversation,
@@ -18,6 +18,7 @@ export default function AIChat() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [pendingUserContent, setPendingUserContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 加载对话列表
@@ -25,11 +26,11 @@ export default function AIChat() {
     loadConversations();
   }, []);
 
-  // 加载选中对话的消息
+  // 加载选中对话的消息（streaming 期间跳过，由 done 事件统一加载）
   useEffect(() => {
-    if (selectedConv) {
+    if (selectedConv && !isStreaming) {
       loadMessages(selectedConv);
-    } else {
+    } else if (!selectedConv) {
       setMessages([]);
     }
   }, [selectedConv]);
@@ -61,6 +62,7 @@ export default function AIChat() {
     setSelectedConv(null);
     setMessages([]);
     setStreamingContent("");
+    setPendingUserContent("");
   };
 
   const handleDeleteConversation = async (name: string) => {
@@ -83,52 +85,57 @@ export default function AIChat() {
     const content = input.trim();
     setInput("");
 
-    // 如果没有选中的对话，生成一个新的
+    // 如果没有选中的对话，生成一个新的（仅作为流式请求的 parent，不立即设置 selectedConv）
     const convName = selectedConv || generateConversationId();
-    if (!selectedConv) {
-      setSelectedConv(convName);
-    }
+    // 注意：不在这里调用 setSelectedConv(convName)
+    // 新对话等待后端 conversationCreated 事件到达后再设置，
+    // 避免 useEffect 提前触发 loadMessages 导致 404（conversation 尚未创建）
 
     setIsStreaming(true);
     setStreamingContent("");
+    setPendingUserContent(content);
 
-    // 立即重新加载消息以显示用户消息（服务端已保存）
-    setTimeout(() => loadMessages(convName), 200);
-
-    await sendMessage(
+    await streamMessage(
       convName,
       content,
       (event: StreamEvent) => {
+        console.log("[AIChat] stream event:", event);
         // 处理 conversation created 事件
         if (event.conversationCreated) {
+          console.log("[AIChat] conversation created:", event.conversationCreated.name);
           setSelectedConv(event.conversationCreated.name);
           // 刷新对话列表
           loadConversations();
         }
         // 处理内容增量
         if (event.content?.delta) {
+          console.log("[AIChat] content delta:", event.content.delta.slice(0, 50));
           setStreamingContent((prev) => prev + event.content!.delta);
         }
         // 处理完成事件
         if (event.done) {
-          // 重新加载消息以获取完整的 assistant 消息
-          loadMessages(convName);
+          console.log("[AIChat] stream done, loading messages for:", convName);
+          // 清除 pending 状态
+          setPendingUserContent("");
           setStreamingContent("");
           setIsStreaming(false);
+          // 重新加载消息（convName 已经是正确的 conversation name）
+          loadMessages(convName);
         }
         // 处理错误事件
         if (event.error) {
-          console.error("Stream error:", event.error);
+          console.error("[AIChat] stream error:", event.error);
           setStreamingContent((prev) => prev + `\n\n[错误: ${event.error!.message}]`);
           setIsStreaming(false);
         }
       },
       (err: Error) => {
-        console.error("Stream failed:", err);
+        console.error("[AIChat] stream failed:", err);
         setStreamingContent((prev) => prev + `\n\n[请求失败: ${err.message}]`);
         setIsStreaming(false);
       },
       () => {
+        console.log("[AIChat] stream onComplete called");
         setIsStreaming(false);
       },
     );
@@ -212,6 +219,14 @@ export default function AIChat() {
               </div>
             </div>
           ))}
+          {/* 显示待发送的用户消息 */}
+          {pendingUserContent && (
+            <div className="mb-4 text-right">
+              <div className="inline-block max-w-[80%] px-4 py-2 rounded-lg bg-primary text-primary-foreground">
+                <div className="whitespace-pre-wrap break-words">{pendingUserContent}</div>
+              </div>
+            </div>
+          )}
           {isStreaming && streamingContent && (
             <div className="mb-4 text-left">
               <div className="inline-block max-w-[80%] px-4 py-2 rounded-lg bg-accent text-accent-foreground">

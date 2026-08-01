@@ -1,9 +1,10 @@
 import { aiConversationServiceClient } from "@/connect";
-import type { AIConversation, AIMessage } from "@/types/proto/api/v1/ai_conversion_pb";
+import type { AIConversation, AIMessage, StreamMessageEvent } from "@/types/proto/api/v1/ai_conversion_pb";
 import {
   ListConversationsRequestSchema,
   ListMessagesRequestSchema,
   SendMessageRequestSchema,
+  StreamMessageRequestSchema,
   UpdateConversationRequestSchema,
   DeleteConversationRequestSchema,
 } from "@/types/proto/api/v1/ai_conversion_pb";
@@ -47,8 +48,8 @@ export async function listMessages(conversationName: string): Promise<AIMessage[
   return response.messages;
 }
 
-// 发送消息（非流式，模拟流式事件回调）
-export async function sendMessage(
+// 发送消息（流式）
+export async function streamMessage(
   conversationName: string,
   content: string,
   onEvent: (event: StreamEvent) => void,
@@ -56,40 +57,57 @@ export async function sendMessage(
   onComplete?: () => void,
 ): Promise<void> {
   try {
-    const request = create(SendMessageRequestSchema, {
+    console.log("[streamMessage] start", { conversationName, content });
+    const request = create(StreamMessageRequestSchema, {
       parent: conversationName,
       content,
     });
 
-    const response = await aiConversationServiceClient.sendMessage(request);
+    // 使用 Connect 协议的 server-streaming
+    const stream = aiConversationServiceClient.streamMessage(request);
+    console.log("[streamMessage] stream created, iterating...");
 
-    // 如果有新创建的对话，发送 conversationCreated 事件
-    if (response.conversation) {
-      onEvent({
-        conversationCreated: {
-          name: response.conversation.name,
-          title: response.conversation.title,
-          model: response.conversation.model,
-        },
-      });
+    for await (const event of stream) {
+      console.log("[streamMessage] received event, case=", event.event.case, event.event);
+      // 转换 proto event 到我们的 StreamEvent 类型
+      if (event.event.case === "conversationCreated") {
+        onEvent({
+          conversationCreated: {
+            name: event.event.value.name,
+            title: event.event.value.title,
+            model: event.event.value.model,
+          },
+        });
+      } else if (event.event.case === "reasoning") {
+        onEvent({
+          reasoning: { delta: event.event.value.delta },
+        });
+      } else if (event.event.case === "content") {
+        onEvent({
+          content: { delta: event.event.value.delta },
+        });
+      } else if (event.event.case === "done") {
+        onEvent({
+          done: {
+            messageName: event.event.value.messageName,
+            tokensUsed: event.event.value.tokensUsed,
+            model: event.event.value.model,
+          },
+        });
+      } else if (event.event.case === "error") {
+        onEvent({
+          error: {
+            message: event.event.value.message,
+            code: event.event.value.code,
+          },
+        });
+      }
     }
 
-    // 发送消息内容
-    if (response.message) {
-      onEvent({
-        content: { delta: response.message.content },
-      });
-      onEvent({
-        done: {
-          messageName: response.message.name,
-          tokensUsed: response.message.tokensUsed,
-          model: response.message.model,
-        },
-      });
-    }
-
+    console.log("[streamMessage] stream completed normally");
     onComplete?.();
   } catch (err) {
+    console.error("[streamMessage] caught error:", err);
     onError?.(err instanceof Error ? err : new Error(String(err)));
   }
 }

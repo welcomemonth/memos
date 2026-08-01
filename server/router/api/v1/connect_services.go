@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"connectrpc.com/connect"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
@@ -666,9 +667,11 @@ func (s *ConnectServiceHandler) SendMessage(ctx context.Context, req *connect.Re
 }
 
 func (s *ConnectServiceHandler) StreamMessage(ctx context.Context, req *connect.Request[v1pb.StreamMessageRequest], stream *connect.ServerStream[v1pb.StreamMessageEvent]) error {
-	// TODO: Implement streaming adapter
-	// This requires converting between connect.ServerStream and grpc.ServerStreamingServer
-	return nil
+	adapter := &connectStreamAdapter[v1pb.StreamMessageEvent]{
+		ctx:    ctx,
+		stream: stream,
+	}
+	return s.APIV1Service.StreamMessage(req.Msg, adapter)
 }
 
 // KnowledgeService
@@ -735,4 +738,38 @@ func (s *ConnectServiceHandler) DeleteDocument(ctx context.Context, req *connect
 		return nil, convertGRPCError(err)
 	}
 	return connect.NewResponse(resp), nil
+}
+
+// connectStreamAdapter wraps a connect.ServerStream to implement grpc.ServerStreamingServer.
+// This bridges Connect protocol handlers with gRPC-style streaming implementations.
+type connectStreamAdapter[T any] struct {
+	ctx    context.Context
+	stream *connect.ServerStream[T]
+}
+
+func (a *connectStreamAdapter[T]) Send(msg *T) error {
+	return a.stream.Send(msg)
+}
+
+func (a *connectStreamAdapter[T]) Context() context.Context {
+	return a.ctx
+}
+
+func (a *connectStreamAdapter[T]) SetHeader(_ metadata.MD) error {
+	return nil
+}
+
+func (a *connectStreamAdapter[T]) SendHeader(_ metadata.MD) error {
+	return nil
+}
+
+func (a *connectStreamAdapter[T]) SetTrailer(_ metadata.MD) {
+}
+
+func (a *connectStreamAdapter[T]) SendMsg(_ any) error {
+	return nil
+}
+
+func (a *connectStreamAdapter[T]) RecvMsg(_ any) error {
+	return nil
 }
