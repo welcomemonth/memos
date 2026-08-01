@@ -812,5 +812,34 @@
     "principle-why-desc": "时间戳之所以被广泛采用，是因为它规避了日期时间的两个核心痛点：\n\n• 跨时区一致性 — 北京时间 2024-12-09 15:30 和纽约时间 2024-12-09 02:30 是同一个时间戳，不存在歧义\n• 易于计算 — 比较两个时间的先后只需比大小，计算时间差只需相减，无需处理进位退位\n• 存储紧凑 — 一个整数就能精确表示一个时刻，比字符串更省空间\n• 排序友好 — 数据库中用整数做索引和排序的效率远高于字符串\n正是因为这些特性，时间戳在数据库存储、API 通信、日志记录、缓存过期等场景中被普遍使用。",
     "principle-issue-title": "2038 年问题",
     "principle-issue-desc": "32 位有符号整数能表示的最大值是 2147483647（即 2³¹ - 1），对应的时间是 2038 年 1 月 19 日 03:14:07 UTC。超过这个时刻，32 位系统上的时间戳会溢出变为负数，导致时间计算出错——这被称为「2038 年问题」，类似于千禧年的 Y2K 问题。\n\n不过现代系统大多已切换到 64 位整数来存储时间戳，足够用到宇宙尽头。大多数编程语言（包括 JavaScript、Python 3、Go、Java 8+、Rust）使用的也是 64 位或任意精度整数，2038 年问题对它们没有影响。"
+  },
+  "ai-chat": {
+    "title": "AI 助手",
+    "description": "与 AI 对话，获取写作、编程、知识管理方面的帮助",
+    "conversations": "对话",
+    "new-conversation": "新对话",
+    "no-conversations": "暂无对话",
+    "welcome": "你好！有什么可以帮你？",
+    "welcome-description": "我是你的 AI 助手，可以帮你写代码、回答问题、整理笔记",
+    "input-placeholder": "输入消息… (Enter 发送, Shift+Enter 换行)",
+    "knowledge-base": "知识库",
+    "write-code": "写代码",
+    "tab-chat": "对话",
+    "tab-knowledge": "知识库",
+    "tab-agents": "Agents",
+    "tab-skills": "Skills",
+    "coming-soon": "即将推出",
+    "mock-response": "这是一个示例回复。AI 功能正在开发中，敬请期待！",
+    "search-conversations": "搜索对话…",
+    "settings": "设置",
+    "prompt-code": "帮我写代码",
+    "prompt-explain": "解释一个概念",
+    "prompt-summarize": "帮我总结内容",
+    "date-group": {
+      "today": "今天",
+      "yesterday": "昨天",
+      "week": "近 7 天",
+      "older": "更早"
+    }
   }
 }

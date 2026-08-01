@@ -1,0 +1,131 @@
+import { BotIcon, BookOpenIcon, CodeIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import UserAvatar from "@/components/UserAvatar";
+import { useTranslate } from "@/utils/i18n";
+import type { ChatMessage } from "../types";
+
+interface Props {
+  message: ChatMessage;
+  avatarUrl?: string;
+}
+
+/**
+ * Render inline markdown: **bold** → <strong>
+ */
+const renderInlineMarkdown = (text: string): React.ReactNode => {
+  return text.split(/(\*\*.*?\*\*)/g).map((segment, i) => {
+    if (segment.startsWith("**") && segment.endsWith("**")) {
+      return (
+        <strong key={i} className="font-semibold">
+          {segment.slice(2, -2)}
+        </strong>
+      );
+    }
+    return segment;
+  });
+};
+
+/**
+ * Parse message content into segments: plain text and code blocks.
+ */
+const parseContent = (content: string): Array<{ type: "text" | "code"; value: string; lang?: string }> => {
+  const segments: Array<{ type: "text" | "code"; value: string; lang?: string }> = [];
+  const codeBlockRegex = /```(\w*)\n?([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: "text", value: content.slice(lastIndex, match.index) });
+    }
+    segments.push({ type: "code", value: match[2].trim(), lang: match[1] || undefined });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    segments.push({ type: "text", value: content.slice(lastIndex) });
+  }
+
+  return segments;
+};
+
+/**
+ * Render a code block with language label and "Write Code" action button.
+ */
+const CodeBlock = ({ code, lang }: { code: string; lang?: string }) => {
+  const t = useTranslate();
+
+  return (
+    <div className="my-2 rounded-lg overflow-hidden border border-border bg-card">
+      {lang && (
+        <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b border-border">
+          <div className="flex items-center gap-1.5">
+            <CodeIcon className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-mono text-muted-foreground">{lang}</span>
+          </div>
+          <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 px-2">
+            <BookOpenIcon className="w-3 h-3" />
+            {t("ai-chat.write-code")}
+          </Button>
+        </div>
+      )}
+      <pre className="px-3 py-2.5 overflow-x-auto text-sm font-mono leading-relaxed text-foreground">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+const MessageBubble = ({ message, avatarUrl }: Props) => {
+  const isUser = message.role === "user";
+  const segments = parseContent(message.content);
+
+  return (
+    <div className={cn("flex gap-3 group", isUser ? "flex-row-reverse" : "flex-row")}>
+      {/* Avatar */}
+      <div className="shrink-0 mt-0.5">
+        {isUser ? (
+          <UserAvatar avatarUrl={avatarUrl} className="w-8 h-8" />
+        ) : (
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <BotIcon className="w-4 h-4 text-primary" />
+          </div>
+        )}
+      </div>
+
+      {/* Bubble */}
+      <div
+        className={cn(
+          "max-w-[75%] rounded-xl px-4 py-3 text-sm leading-relaxed",
+          isUser
+            ? "bg-primary text-primary-foreground rounded-tr-sm"
+            : "bg-muted/50 text-foreground rounded-tl-sm border border-border/50",
+        )}
+      >
+        {isUser ? (
+          <span>{message.content}</span>
+        ) : (
+          <div className="space-y-1">
+            {segments.map((segment, i) =>
+              segment.type === "code" ? (
+                <CodeBlock key={i} code={segment.value} lang={segment.lang} />
+              ) : (
+                <div key={i} className="whitespace-pre-wrap">
+                  {segment.value.split("\n").map((line, lineIdx) => (
+                    <span key={lineIdx}>
+                      {lineIdx > 0 && <br />}
+                      {renderInlineMarkdown(line)}
+                    </span>
+                  ))}
+                </div>
+              ),
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MessageBubble;

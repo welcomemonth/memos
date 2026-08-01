@@ -1,4 +1,4 @@
-import { ArrowLeftRightIcon, BinaryIcon, ClockIcon, WrenchIcon } from "lucide-react";
+import { ArrowLeftRightIcon, BinaryIcon, BotIcon, ClockIcon, WrenchIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import MobileHeader from "@/components/MobileHeader";
 import useMediaQuery from "@/hooks/useMediaQuery";
@@ -16,6 +16,12 @@ const Tools = () => {
       description: t("file-transfer.description"),
       icon: ArrowLeftRightIcon,
       to: Routes.FILE_TRANSFER,
+    },
+    {
+      title: t("ai-chat.title"),
+      description: t("ai-chat.description"),
+      icon: BotIcon,
+      to: Routes.AI_CHAT,
     },
     {
       title: t("base64.title"),

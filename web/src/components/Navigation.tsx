@@ -1,4 +1,4 @@
-import { BellIcon, EarthIcon, InfoIcon, LibraryIcon, MessageSquareIcon, PaperclipIcon, UserCircleIcon, WrenchIcon } from "lucide-react";
+import { BellIcon, BotIcon, EarthIcon, InfoIcon, LibraryIcon, PaperclipIcon, UserCircleIcon, WrenchIcon } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import useCurrentUser from "@/hooks/useCurrentUser";
@@ -40,6 +40,12 @@ const Navigation = (props: Props) => {
     title: t("common.tools"),
     icon: <WrenchIcon className="w-6 h-auto shrink-0" />,
   };
+  const aiChatNavLink: NavLinkItem = {
+    id: "header-ai-chat",
+    path: Routes.AI_CHAT,
+    title: t("ai-chat.title"),
+    icon: <BotIcon className="w-6 h-auto shrink-0" />,
+  };
   const exploreNavLink: NavLinkItem = {
     id: "header-explore",
     path: Routes.EXPLORE,
@@ -57,12 +63,6 @@ const Navigation = (props: Props) => {
     path: Routes.ATTACHMENTS,
     title: t("common.attachments"),
     icon: <PaperclipIcon className="w-6 h-auto shrink-0" />,
-  };
-  const aiChatNavLink: NavLinkItem = {
-    id: "header-ai-chat",
-    path: Routes.AI_CHAT,
-    title: "AI Chat",
-    icon: <MessageSquareIcon className="w-6 h-auto shrink-0" />,
   };
   const unreadCount = notifications.filter((n) => n.status === UserNotification_Status.UNREAD).length;
   const inboxNavLink: NavLinkItem = {
@@ -89,7 +89,7 @@ const Navigation = (props: Props) => {
 
   const primaryNavLinks: NavLinkItem[] = currentUser
     ? [homeNavLink, toolsNavLink, aiChatNavLink, exploreNavLink, attachmentsNavLink, inboxNavLink]
-    : [toolsNavLink, exploreNavLink, aboutNavLink, signInNavLink];
+    : [toolsNavLink, aiChatNavLink, exploreNavLink, aboutNavLink, signInNavLink];
   const inboxAriaLabel = unreadCount > 0 ? `${t("common.inbox")}, ${unreadCount} unread` : t("common.inbox");
 
   return (

@@ -13,7 +13,7 @@ export const ROUTES = {
   FILE_TRANSFER: "/tools/file-transfer",
   BASE64: "/tools/base64",
   TIMESTAMP: "/tools/timestamp",
-  AI_CHAT: "/ai-chat",
+  AI_CHAT: "/chat",
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;
