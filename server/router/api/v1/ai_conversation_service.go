@@ -492,12 +492,12 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 
 	// ===== 6. 构建对话历史（排除当前这条用户消息，避免重复） =====
-	history, err := buildHistory(ctx, s.Store, conv.ID, userMsg.UID)
+	history, err := buildHistory(ctx, s.Store, conv.ID)
 	if err != nil {
 		slog.Warn("failed to build history", "err", err)
 		history = []*schema.Message{}
 	}
-	slog.Debug("Current Conversation History: ", history)
+	slog.Debug("Current Conversation History", "count", len(history), "history", history)
 	// ===== 7. 调用 Eino 流式生成 =====
 	runner, err := chatChain.BuildchatChain(ctx)
 	if err != nil {
@@ -690,8 +690,7 @@ func mustGenerateUID() string {
 }
 
 // buildHistory 从 DB 读取会话历史，转换为 eino schema.Message 列表。
-// excludeUID 用于排除当前用户消息（避免和 question 字段重复）。
-func buildHistory(ctx context.Context, db *store.Store, conversationID int32, excludeUID string) ([]*schema.Message, error) {
+func buildHistory(ctx context.Context, db *store.Store, conversationID int32) ([]*schema.Message, error) {
 	msgs, err := db.ListAIMessages(ctx, &store.FindAIMessage{
 		ConversationID: &conversationID,
 	})
@@ -701,8 +700,11 @@ func buildHistory(ctx context.Context, db *store.Store, conversationID int32, ex
 
 	history := make([]*schema.Message, 0, len(msgs))
 	for _, m := range msgs {
-		if m.UID == excludeUID {
-			continue
+		// if m.UID == excludeUID {
+		// 	continue
+		// }
+		if m.Status != store.AIMessageStatusCompleted {
+			continue // 没有完成的对话也不加入
 		}
 		var msg *schema.Message
 		switch m.Role {

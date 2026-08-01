@@ -19,7 +19,6 @@ func newChatTemplate(ctx context.Context) (ctp prompt.ChatTemplate, err error) {
 		FormatType: schema.FString,
 		Templates: []schema.MessagesTemplate{
 			schema.SystemMessage(SystemPrompt),
-			schema.UserMessage("{question}"),
 			schema.MessagesPlaceholder("history", true),
 		},
 	}
