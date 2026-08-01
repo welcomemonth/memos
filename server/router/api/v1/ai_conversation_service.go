@@ -396,9 +396,10 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *v1pb.SendMessag
 // StreamMessage streams the assistant reply via Connect server-streaming.
 //
 // 数据流：
-//   前端 request.Content → Eino runner.Stream() → 逐 chunk 通过 stream.Send() 推送
-//   每个 chunk 是 *schema.Message，Content → ContentDelta，ReasoningContent → ReasoningDelta
-//   流结束后：先创建 assistant message 到 DB → 发送 StreamDone → 更新 conversation title
+//
+//	前端 request.Content → Eino runner.Stream() → 逐 chunk 通过 stream.Send() 推送
+//	每个 chunk 是 *schema.Message，Content → ContentDelta，ReasoningContent → ReasoningDelta
+//	流结束后：先创建 assistant message 到 DB → 发送 StreamDone → 更新 conversation title
 func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream grpc.ServerStreamingServer[v1pb.StreamMessageEvent]) error {
 	ctx := stream.Context()
 
@@ -490,7 +491,14 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		return status.Errorf(codes.Internal, "failed to create assistant message: %v", err)
 	}
 
-	// ===== 6. 调用 Eino 流式生成 =====
+	// ===== 6. 构建对话历史（排除当前这条用户消息，避免重复） =====
+	history, err := buildHistory(ctx, s.Store, conv.ID, userMsg.UID)
+	if err != nil {
+		slog.Warn("failed to build history", "err", err)
+		history = []*schema.Message{}
+	}
+
+	// ===== 7. 调用 Eino 流式生成 =====
 	runner, err := chatChain.BuildchatChain(ctx)
 	if err != nil {
 		// 构建失败 → 更新 message 状态为 error，通知前端
@@ -503,7 +511,10 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		return status.Errorf(codes.Internal, "failed to build chat chain: %v", err)
 	}
 
-	streamReader, err := runner.Stream(ctx, request.Content)
+	streamReader, err := runner.Stream(ctx, map[string]any{
+		"question": request.Content,
+		"history":  history,
+	})
 	if err != nil {
 		errMsg := "failed to start stream: " + err.Error()
 		_ = s.Store.UpdateAIMessage(ctx, &store.UpdateAIMessage{
@@ -676,6 +687,37 @@ func mustGenerateUID() string {
 		panic("failed to generate UID: " + err.Error())
 	}
 	return uid
+}
+
+// buildHistory 从 DB 读取会话历史，转换为 eino schema.Message 列表。
+// excludeUID 用于排除当前用户消息（避免和 question 字段重复）。
+func buildHistory(ctx context.Context, db *store.Store, conversationID int32, excludeUID string) ([]*schema.Message, error) {
+	msgs, err := db.ListAIMessages(ctx, &store.FindAIMessage{
+		ConversationID: &conversationID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	history := make([]*schema.Message, 0, len(msgs))
+	for _, m := range msgs {
+		if m.UID == excludeUID {
+			continue
+		}
+		var msg *schema.Message
+		switch m.Role {
+		case store.AIMessageRoleUser:
+			msg = schema.UserMessage(m.Content)
+		case store.AIMessageRoleAssistant:
+			msg = schema.AssistantMessage(m.Content, nil)
+		case store.AIMessageRoleSystem:
+			msg = schema.SystemMessage(m.Content)
+		default:
+			continue
+		}
+		history = append(history, msg)
+	}
+	return history, nil
 }
 
 // callEinoChat calls the Eino framework to get AI response
