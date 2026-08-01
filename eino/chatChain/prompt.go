@@ -20,7 +20,7 @@ func newChatTemplate(ctx context.Context) (ctp prompt.ChatTemplate, err error) {
 		Templates: []schema.MessagesTemplate{
 			schema.SystemMessage("你是个人助理，{style}"),
 			schema.UserMessage("{question}"),
-			schema.MessagesPlaceholder("history", false),
+			schema.MessagesPlaceholder("history", true),
 		},
 	}
 	ctp = prompt.FromMessages(config.FormatType, config.Templates...)

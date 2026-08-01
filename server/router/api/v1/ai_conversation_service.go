@@ -349,8 +349,12 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *v1pb.SendMessag
 		return nil, status.Errorf(codes.Internal, "failed to create user message: %v", err)
 	}
 
-	// TODO: 调用 Eino 框架获取 AI 回复
-	assistantContent := "AI 回复功能尚未集成，请等待 Eino 框架接入。"
+	// 调用 Eino 框架获取 AI 回复
+	assistantContent, err := callEinoChat(ctx, request.Content)
+	if err != nil {
+		slog.Error("Failed to call Eino chat", "error", err)
+		assistantContent = "抱歉，AI 服务暂时不可用：" + err.Error()
+	}
 	assistantModel := request.Model
 	if assistantModel == "" {
 		assistantModel = conv.Model
@@ -672,4 +676,31 @@ func mustGenerateUID() string {
 		panic("failed to generate UID: " + err.Error())
 	}
 	return uid
+}
+
+// callEinoChat calls the Eino framework to get AI response
+func callEinoChat(ctx context.Context, question string) (string, error) {
+	// Build the chat chain
+	runner, err := chatChain.BuildchatChain(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	// Invoke the chain with the question
+	result, err := runner.Invoke(ctx, question)
+	if err != nil {
+		return "", err
+	}
+
+	// Convert result to string
+	if msg, ok := result.(*schema.Message); ok && msg != nil {
+		return msg.Content, nil
+	}
+
+	// If result is already a string
+	if str, ok := result.(string); ok {
+		return str, nil
+	}
+
+	return "无法解析 AI 响应", nil
 }
