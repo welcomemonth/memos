@@ -497,7 +497,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		slog.Warn("failed to build history", "err", err)
 		history = []*schema.Message{}
 	}
-
+	slog.Debug("Current Conversation History: ", history)
 	// ===== 7. 调用 Eino 流式生成 =====
 	runner, err := chatChain.BuildchatChain(ctx)
 	if err != nil {

@@ -27,7 +27,9 @@ func newChatTemplate(ctx context.Context) (ctp prompt.ChatTemplate, err error) {
 	return ctp, nil
 }
 
-var SystemPrompt = `
+var SystemPrompt = `你是个人助手`
+
+var SystemPrompt1 = `
 你是一位精通费曼学习法的导师。你的核心任务是用费曼学习法帮我真正理解任何知识，而不是简单地灌输信息。
 
 费曼学习法的核心原则：
