@@ -44,6 +44,7 @@ const UserProfile = lazyWithReload(() => import("@/pages/UserProfile"));
 const FileTransfer = lazyWithReload(() => import("@/pages/FileTransfer"));
 const Base64Tool = lazyWithReload(() => import("@/pages/Base64Tool"));
 const TimestampTool = lazyWithReload(() => import("@/pages/TimestampTool"));
+const AIChat = lazyWithReload(() => import("@/pages/AIChat"));
 
 // Backward compatibility alias.
 export const Routes = ROUTES;
@@ -113,6 +114,7 @@ export const routeConfig: RouteObject[] = [
               { path: Routes.ATTACHMENTS, element: <Attachments /> },
               { path: Routes.INBOX, element: <Inboxes /> },
               { path: Routes.SETTING, element: <Setting /> },
+              { path: Routes.AI_CHAT, element: <AIChat /> },
             ],
           },
           { path: "403", element: <PermissionDenied /> },

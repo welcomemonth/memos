@@ -3,6 +3,7 @@ import { Code, ConnectError, createClient, type Interceptor } from "@connectrpc/
 import { createConnectTransport } from "@connectrpc/connect-web";
 import { getAccessToken, hasStoredToken, isTokenExpired, REQUEST_TOKEN_EXPIRY_BUFFER_MS, setAccessToken } from "./auth-state";
 import { AIService } from "./types/proto/api/v1/ai_service_pb";
+import { AIConversationService } from "./types/proto/api/v1/ai_conversion_service_pb";
 import { AttachmentService } from "./types/proto/api/v1/attachment_service_pb";
 import { AuthService } from "./types/proto/api/v1/auth_service_pb";
 import { IdentityProviderService } from "./types/proto/api/v1/idp_service_pb";
@@ -197,6 +198,7 @@ export const userServiceClient = createClient(UserService, transport);
 export const memoServiceClient = createClient(MemoService, transport);
 export const attachmentServiceClient = createClient(AttachmentService, transport);
 export const aiServiceClient = createClient(AIService, transport);
+export const aiConversationServiceClient = createClient(AIConversationService, transport);
 export const shortcutServiceClient = createClient(ShortcutService, transport);
 
 // Configuration service clients
