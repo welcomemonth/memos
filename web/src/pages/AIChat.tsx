@@ -18,6 +18,8 @@ export default function AIChat() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [streamingReasoning, setStreamingReasoning] = useState("");
+  const [reasoningExpanded, setReasoningExpanded] = useState(true);
   const [pendingUserContent, setPendingUserContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +64,7 @@ export default function AIChat() {
     setSelectedConv(null);
     setMessages([]);
     setStreamingContent("");
+    setStreamingReasoning("");
     setPendingUserContent("");
   };
 
@@ -93,6 +96,8 @@ export default function AIChat() {
 
     setIsStreaming(true);
     setStreamingContent("");
+    setStreamingReasoning("");
+    setReasoningExpanded(true);
     setPendingUserContent(content);
 
     await streamMessage(
@@ -112,12 +117,17 @@ export default function AIChat() {
           console.log("[AIChat] content delta:", event.content.delta.slice(0, 50));
           setStreamingContent((prev) => prev + event.content!.delta);
         }
+        // 处理推理过程增量
+        if (event.reasoning?.delta) {
+          setStreamingReasoning((prev) => prev + event.reasoning!.delta);
+        }
         // 处理完成事件
         if (event.done) {
           console.log("[AIChat] stream done, loading messages for:", convName);
           // 清除 pending 状态
           setPendingUserContent("");
           setStreamingContent("");
+          setStreamingReasoning("");
           setIsStreaming(false);
           // 重新加载消息（convName 已经是正确的 conversation name）
           loadMessages(convName);
@@ -227,17 +237,39 @@ export default function AIChat() {
               </div>
             </div>
           )}
+          {/* 流式推理过程（可折叠） */}
+          {isStreaming && streamingReasoning && (
+            <div className="mb-2 text-left">
+              <div className="inline-block max-w-[80%]">
+                <button
+                  onClick={() => setReasoningExpanded((prev) => !prev)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
+                >
+                  <span className="inline-block animate-spin">⟳</span>
+                  <span>思考中…</span>
+                  <span className="text-muted-foreground/50">{reasoningExpanded ? "▼" : "▶"}</span>
+                </button>
+                {reasoningExpanded && (
+                  <div className="text-xs text-muted-foreground/70 whitespace-pre-wrap break-words pl-4 border-l-2 border-muted">
+                    {streamingReasoning}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {/* 流式推理中，尚未有推理内容 */}
+          {isStreaming && !streamingReasoning && !streamingContent && (
+            <div className="mb-4 text-left">
+              <div className="inline-block px-4 py-2 rounded-lg bg-accent text-accent-foreground">
+                <span className="animate-pulse">AI 正在思考...</span>
+              </div>
+            </div>
+          )}
+          {/* 流式正文内容 */}
           {isStreaming && streamingContent && (
             <div className="mb-4 text-left">
               <div className="inline-block max-w-[80%] px-4 py-2 rounded-lg bg-accent text-accent-foreground">
                 <div className="whitespace-pre-wrap break-words">{streamingContent}</div>
-              </div>
-            </div>
-          )}
-          {isStreaming && !streamingContent && (
-            <div className="mb-4 text-left">
-              <div className="inline-block px-4 py-2 rounded-lg bg-accent text-accent-foreground">
-                <span className="animate-pulse">AI 正在思考...</span>
               </div>
             </div>
           )}
