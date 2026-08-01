@@ -26,13 +26,15 @@ const ChatView = ({ messages, onSend, isStreaming, streamingContent, streamingRe
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const [input, setInput] = useState("");
-  const [reasoningExpanded, setReasoningExpanded] = useState(true);
+  const [streamingReasoningExpanded, setStreamingReasoningExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Only auto-scroll when a new message is added, NOT during streaming
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, isStreaming, streamingContent, streamingReasoning]);
+  }, [messages.length]);
 
   const handleSend = useCallback(() => {
     const content = input.trim();
@@ -42,6 +44,10 @@ const ChatView = ({ messages, onSend, isStreaming, streamingContent, streamingRe
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
+    // Scroll to bottom when user sends a message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
   }, [input, isStreaming, onSend]);
 
   const handleKeyDown = useCallback(
@@ -88,7 +94,7 @@ const ChatView = ({ messages, onSend, isStreaming, streamingContent, streamingRe
       </header>
 
       {/* ── Messages ────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-5">
@@ -116,7 +122,7 @@ const ChatView = ({ messages, onSend, isStreaming, streamingContent, streamingRe
               <MessageBubble key={msg.id} message={msg} avatarUrl={currentUser?.avatarUrl} />
             ))}
 
-            {/* ── Streaming: Reasoning (collapsible) ─────────────── */}
+            {/* ── Streaming: Reasoning (collapsible, default collapsed) ── */}
             {isStreaming && streamingReasoning && (
               <div className="flex gap-3">
                 <div className="shrink-0 mt-0.5">
@@ -126,14 +132,14 @@ const ChatView = ({ messages, onSend, isStreaming, streamingContent, streamingRe
                 </div>
                 <div className="max-w-[75%]">
                   <button
-                    onClick={() => setReasoningExpanded((prev) => !prev)}
+                    onClick={() => setStreamingReasoningExpanded((prev) => !prev)}
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
                   >
                     <span className="inline-block animate-spin">⟳</span>
                     <span>思考中…</span>
-                    <span className="text-muted-foreground/50">{reasoningExpanded ? "▼" : "▶"}</span>
+                    <span className="text-muted-foreground/50">{streamingReasoningExpanded ? "▼" : "▶"}</span>
                   </button>
-                  {reasoningExpanded && (
+                  {streamingReasoningExpanded && (
                     <div className="text-xs text-muted-foreground/70 whitespace-pre-wrap break-words pl-4 border-l-2 border-border">
                       {streamingReasoning}
                     </div>
@@ -142,7 +148,7 @@ const ChatView = ({ messages, onSend, isStreaming, streamingContent, streamingRe
               </div>
             )}
 
-            {/* ── Streaming: Thinking (no reasoning yet) ───────── */}
+            {/* ── Streaming: Thinking indicator (no reasoning yet) ──── */}
             {isStreaming && !streamingReasoning && !streamingContent && (
               <div className="flex gap-3">
                 <div className="shrink-0 mt-0.5">
@@ -160,7 +166,7 @@ const ChatView = ({ messages, onSend, isStreaming, streamingContent, streamingRe
               </div>
             )}
 
-            {/* ── Streaming: Content ───────────────────────────── */}
+            {/* ── Streaming: Content ───────────────────────────────── */}
             {isStreaming && streamingContent && (
               <MessageBubble
                 message={{

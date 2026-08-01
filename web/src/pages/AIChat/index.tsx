@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslate } from "@/utils/i18n";
 import {
   listConversations,
@@ -14,7 +14,12 @@ import Sidebar from "./components/Sidebar";
 import type { ChatMessage, Conversation, SidebarTab } from "./types";
 
 /** Convert API conversation to local Conversation type */
-const toLocalConversation = (apiConv: { name: string; title: string; model?: string; updateTime?: { seconds: bigint } }): Conversation => ({
+const toLocalConversation = (apiConv: {
+  name: string;
+  title: string;
+  model?: string;
+  updateTime?: { seconds: bigint };
+}): Conversation => ({
   id: apiConv.name,
   name: apiConv.name,
   title: apiConv.title || "新对话",
@@ -24,7 +29,13 @@ const toLocalConversation = (apiConv: { name: string; title: string; model?: str
 });
 
 /** Convert API message to local ChatMessage type */
-const toLocalMessage = (apiMsg: { name: string; role: number; content: string; model?: string; createTime?: { seconds: bigint } }): ChatMessage => ({
+const toLocalMessage = (apiMsg: {
+  name: string;
+  role: number;
+  content: string;
+  model?: string;
+  createTime?: { seconds: bigint };
+}): ChatMessage => ({
   id: apiMsg.name,
   role: apiMsg.role === AIMessage_Role.USER ? "user" : "assistant",
   content: apiMsg.content,
@@ -41,6 +52,9 @@ const AIChat = () => {
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingReasoning, setStreamingReasoning] = useState("");
 
+  // Track the currently streaming conversation to avoid stale closures
+  const streamingConvIdRef = useRef<string>("");
+
   // Load conversations from API
   const loadConversations = useCallback(async () => {
     try {
@@ -52,7 +66,7 @@ const AIChat = () => {
     }
   }, []);
 
-  // Load messages for a specific conversation
+  // Load messages for a specific conversation (only on conversation switch)
   const loadMessages = useCallback(async (convName: string) => {
     try {
       const msgs = await listMessages(convName);
@@ -69,7 +83,7 @@ const AIChat = () => {
     loadConversations();
   }, [loadConversations]);
 
-  // When activeConvId changes, load messages (unless streaming)
+  // Load messages only when switching conversations (not during streaming)
   useEffect(() => {
     if (activeConvId && !isStreaming) {
       loadMessages(activeConvId);
@@ -83,7 +97,6 @@ const AIChat = () => {
     async (content: string) => {
       if (!content.trim() || isStreaming) return;
 
-      // Generate new conversation ID if none selected
       const convName = activeConvId || generateConversationId();
 
       // Optimistically add user message
@@ -108,7 +121,6 @@ const AIChat = () => {
               : conv,
           );
         }
-        // New conversation
         const newConv: Conversation = {
           id: convName,
           name: convName,
@@ -126,17 +138,20 @@ const AIChat = () => {
       setIsStreaming(true);
       setStreamingContent("");
       setStreamingReasoning("");
+      streamingConvIdRef.current = convName;
 
       await streamMessage(
         convName,
         content,
         (event: StreamEvent) => {
           if (event.conversationCreated) {
-            // Update the conversation ID with the server's confirmed name
             const serverName = event.conversationCreated.name;
+            const prevId = streamingConvIdRef.current;
+            streamingConvIdRef.current = serverName;
+
             setConversations((prev) =>
               prev.map((conv) =>
-                conv.id === convName
+                conv.id === prevId
                   ? {
                       ...conv,
                       id: serverName,
@@ -157,11 +172,28 @@ const AIChat = () => {
             setStreamingReasoning((prev) => prev + event.reasoning!.delta);
           }
           if (event.done) {
-            setIsStreaming(false);
+            // Append assistant message directly to local state (no API reload)
+            const currentConvId = streamingConvIdRef.current;
+            const assistantMsg: ChatMessage = {
+              id: event.done.messageName || `assistant-${Date.now()}`,
+              role: "assistant",
+              content: streamingContentRef.current,
+              reasoning: streamingReasoningRef.current || undefined,
+              model: event.done.model,
+              timestamp: Date.now(),
+            };
+
+            setConversations((prev) =>
+              prev.map((conv) =>
+                conv.id === currentConvId
+                  ? { ...conv, messages: [...conv.messages, assistantMsg], updatedAt: Date.now() }
+                  : conv,
+              ),
+            );
+
             setStreamingContent("");
             setStreamingReasoning("");
-            // Reload messages from API to get persisted data
-            loadMessages(activeConvId || convName);
+            setIsStreaming(false);
           }
           if (event.error) {
             console.error("Stream error:", event.error);
@@ -179,8 +211,18 @@ const AIChat = () => {
         },
       );
     },
-    [activeConvId, isStreaming, loadConversations, loadMessages],
+    [activeConvId, isStreaming, loadConversations],
   );
+
+  // Refs to track latest streaming state for the done handler (avoid stale closures)
+  const streamingContentRef = useRef("");
+  const streamingReasoningRef = useRef("");
+  useEffect(() => {
+    streamingContentRef.current = streamingContent;
+  }, [streamingContent]);
+  useEffect(() => {
+    streamingReasoningRef.current = streamingReasoning;
+  }, [streamingReasoning]);
 
   const handleNewConversation = useCallback(() => {
     setActiveConvId("");

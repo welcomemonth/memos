@@ -1,4 +1,5 @@
-import { BotIcon, BookOpenIcon, CodeIcon } from "lucide-react";
+import { useState } from "react";
+import { BotIcon, BookOpenIcon, ChevronDownIcon, CodeIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
@@ -77,6 +78,33 @@ const CodeBlock = ({ code, lang }: { code: string; lang?: string }) => {
   );
 };
 
+/**
+ * Collapsible reasoning section for assistant messages.
+ */
+const ReasoningSection = ({ reasoning }: { reasoning: string }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setExpanded((prev) => !prev)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <BotIcon className="w-3.5 h-3.5" />
+        <span>查看思考过程</span>
+        <ChevronDownIcon
+          className={cn("w-3.5 h-3.5 transition-transform duration-200", expanded && "rotate-180")}
+        />
+      </button>
+      {expanded && (
+        <div className="mt-1.5 text-xs text-muted-foreground/70 whitespace-pre-wrap break-words pl-4 border-l-2 border-border">
+          {reasoning}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MessageBubble = ({ message, avatarUrl }: Props) => {
   const isUser = message.role === "user";
   const segments = parseContent(message.content);
@@ -95,34 +123,39 @@ const MessageBubble = ({ message, avatarUrl }: Props) => {
       </div>
 
       {/* Bubble */}
-      <div
-        className={cn(
-          "max-w-[75%] rounded-xl px-4 py-3 text-sm leading-relaxed",
-          isUser
-            ? "bg-primary text-primary-foreground rounded-tr-sm"
-            : "bg-muted/50 text-foreground rounded-tl-sm border border-border/50",
-        )}
-      >
-        {isUser ? (
-          <span>{message.content}</span>
-        ) : (
-          <div className="space-y-1">
-            {segments.map((segment, i) =>
-              segment.type === "code" ? (
-                <CodeBlock key={i} code={segment.value} lang={segment.lang} />
-              ) : (
-                <div key={i} className="whitespace-pre-wrap">
-                  {segment.value.split("\n").map((line, lineIdx) => (
-                    <span key={lineIdx}>
-                      {lineIdx > 0 && <br />}
-                      {renderInlineMarkdown(line)}
-                    </span>
-                  ))}
-                </div>
-              ),
-            )}
-          </div>
-        )}
+      <div className={cn("max-w-[75%] min-w-0", isUser ? "" : "")}>
+        {/* Reasoning (only for assistant messages with reasoning) */}
+        {!isUser && message.reasoning && <ReasoningSection reasoning={message.reasoning} />}
+
+        <div
+          className={cn(
+            "rounded-xl px-4 py-3 text-sm leading-relaxed",
+            isUser
+              ? "bg-primary text-primary-foreground rounded-tr-sm"
+              : "bg-muted/50 text-foreground rounded-tl-sm border border-border/50",
+          )}
+        >
+          {isUser ? (
+            <span>{message.content}</span>
+          ) : (
+            <div className="space-y-1">
+              {segments.map((segment, i) =>
+                segment.type === "code" ? (
+                  <CodeBlock key={i} code={segment.value} lang={segment.lang} />
+                ) : (
+                  <div key={i} className="whitespace-pre-wrap">
+                    {segment.value.split("\n").map((line, lineIdx) => (
+                      <span key={lineIdx}>
+                        {lineIdx > 0 && <br />}
+                        {renderInlineMarkdown(line)}
+                      </span>
+                    ))}
+                  </div>
+                ),
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
