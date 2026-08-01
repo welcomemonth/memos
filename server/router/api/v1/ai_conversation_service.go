@@ -2,6 +2,9 @@ package v1
 
 import (
 	"context"
+	"errors"
+	"io"
+	"log/slog"
 	"time"
 
 	"google.golang.org/grpc"
@@ -10,6 +13,9 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/cloudwego/eino/schema"
+
+	"github.com/usememos/memos/eino/chatChain"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
@@ -383,11 +389,16 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *v1pb.SendMessag
 	}, nil
 }
 
-// StreamMessage streams the assistant reply.
-// TODO: 集成 Eino 框架后实现完整的流式 AI 对话
+// StreamMessage streams the assistant reply via Connect server-streaming.
+//
+// 数据流：
+//   前端 request.Content → Eino runner.Stream() → 逐 chunk 通过 stream.Send() 推送
+//   每个 chunk 是 *schema.Message，Content → ContentDelta，ReasoningContent → ReasoningDelta
+//   流结束后：先创建 assistant message 到 DB → 发送 StreamDone → 更新 conversation title
 func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream grpc.ServerStreamingServer[v1pb.StreamMessageEvent]) error {
 	ctx := stream.Context()
 
+	// ===== 1. 鉴权 =====
 	user, err := s.fetchCurrentUser(ctx)
 	if err != nil {
 		return status.Errorf(codes.Internal, "failed to get current user: %v", err)
@@ -404,7 +415,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		return status.Errorf(codes.InvalidArgument, "invalid parent: %v", err)
 	}
 
-	// 查找或自动创建 conversation
+	// ===== 2. 查找或自动创建 conversation =====
 	conv, err := s.Store.GetAIConversation(ctx, &store.FindAIConversation{
 		UID:       &convUID,
 		CreatorID: &user.ID,
@@ -426,7 +437,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		created = true
 	}
 
-	// 如果是新对话，发送 ConversationCreated 事件
+	// ===== 3. 如果是新对话，先通知前端 =====
 	if created {
 		if err := stream.Send(&v1pb.StreamMessageEvent{
 			Event: &v1pb.StreamMessageEvent_ConversationCreated{
@@ -441,7 +452,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		}
 	}
 
-	// 创建 user message
+	// ===== 4. 保存用户消息 =====
 	userMsg, err := s.Store.CreateAIMessage(ctx, &store.AIMessage{
 		UID:              mustGenerateUID(),
 		ConversationID:   conv.ID,
@@ -456,27 +467,17 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		return status.Errorf(codes.Internal, "failed to create user message: %v", err)
 	}
 
-	// TODO: 调用 Eino 框架流式接口，逐帧发送 StreamMessageEvent
-	content := "流式 AI 回复功能尚未集成，请等待 Eino 框架接入。"
-	if err := stream.Send(&v1pb.StreamMessageEvent{
-		Event: &v1pb.StreamMessageEvent_Content{
-			Content: &v1pb.ContentDelta{Delta: content},
-		},
-	}); err != nil {
-		return err
-	}
-
+	// ===== 5. 先创建一个 pending 状态的 assistant message =====
 	assistantModel := request.Model
 	if assistantModel == "" {
 		assistantModel = conv.Model
 	}
-
 	assistantMsg, err := s.Store.CreateAIMessage(ctx, &store.AIMessage{
 		UID:              mustGenerateUID(),
 		ConversationID:   conv.ID,
 		Role:             store.AIMessageRoleAssistant,
-		Status:           store.AIMessageStatusCompleted,
-		Content:          content,
+		Status:           store.AIMessageStatusPending,
+		Content:          "",
 		Model:            assistantModel,
 		ParentMessageUID: userMsg.UID,
 		Payload:          "{}",
@@ -485,7 +486,96 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		return status.Errorf(codes.Internal, "failed to create assistant message: %v", err)
 	}
 
-	// 发送完成事件
+	// ===== 6. 调用 Eino 流式生成 =====
+	runner, err := chatChain.BuildchatChain(ctx)
+	if err != nil {
+		// 构建失败 → 更新 message 状态为 error，通知前端
+		errMsg := "failed to build chat chain: " + err.Error()
+		_ = s.Store.UpdateAIMessage(ctx, &store.UpdateAIMessage{
+			ID:           assistantMsg.ID,
+			Status:       ptrStatus(store.AIMessageStatusError),
+			ErrorMessage: &errMsg,
+		})
+		return status.Errorf(codes.Internal, "failed to build chat chain: %v", err)
+	}
+
+	streamReader, err := runner.Stream(ctx, request.Content)
+	if err != nil {
+		errMsg := "failed to start stream: " + err.Error()
+		_ = s.Store.UpdateAIMessage(ctx, &store.UpdateAIMessage{
+			ID:           assistantMsg.ID,
+			Status:       ptrStatus(store.AIMessageStatusError),
+			ErrorMessage: &errMsg,
+		})
+		return status.Errorf(codes.Internal, "failed to start stream: %v", err)
+	}
+	defer streamReader.Close()
+
+	// ===== 7. 逐 chunk 推送给前端 =====
+	var fullContent string
+	for {
+		chunk, recvErr := streamReader.Recv()
+
+		// 流结束
+		if errors.Is(recvErr, io.EOF) {
+			break
+		}
+		// 接收出错 → 通知前端，但保留已生成的内容
+		if recvErr != nil {
+			slog.Error("stream recv error", "err", recvErr)
+			_ = stream.Send(&v1pb.StreamMessageEvent{
+				Event: &v1pb.StreamMessageEvent_Error{
+					Error: &v1pb.StreamError{
+						Message: recvErr.Error(),
+						Code:    "STREAM_RECV_ERROR",
+					},
+				},
+			})
+			break
+		}
+
+		// 类型断言为 schema.Message
+		msg, ok := chunk.(*schema.Message)
+		if !ok {
+			slog.Warn("unexpected chunk type", "type", chunk)
+			continue
+		}
+
+		// 推送 reasoning（思考过程）
+		if msg.ReasoningContent != "" {
+			if sendErr := stream.Send(&v1pb.StreamMessageEvent{
+				Event: &v1pb.StreamMessageEvent_Reasoning{
+					Reasoning: &v1pb.ReasoningDelta{Delta: msg.ReasoningContent},
+				},
+			}); sendErr != nil {
+				// 客户端断开连接
+				return sendErr
+			}
+		}
+
+		// 推送 content（正文）
+		if msg.Content != "" {
+			if sendErr := stream.Send(&v1pb.StreamMessageEvent{
+				Event: &v1pb.StreamMessageEvent_Content{
+					Content: &v1pb.ContentDelta{Delta: msg.Content},
+				},
+			}); sendErr != nil {
+				return sendErr
+			}
+			fullContent += msg.Content
+		}
+	}
+
+	// ===== 8. 流结束 → 更新 DB 中的 assistant message =====
+	if err := s.Store.UpdateAIMessage(ctx, &store.UpdateAIMessage{
+		ID:      assistantMsg.ID,
+		Status:  ptrStatus(store.AIMessageStatusCompleted),
+		Content: &fullContent,
+	}); err != nil {
+		slog.Error("failed to update assistant message", "err", err)
+	}
+
+	// ===== 9. 发送完成事件 =====
 	if err := stream.Send(&v1pb.StreamMessageEvent{
 		Event: &v1pb.StreamMessageEvent_Done{
 			Done: &v1pb.StreamDone{
@@ -497,7 +587,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		return err
 	}
 
-	// 如果是新对话，更新 title
+	// ===== 10. 如果是新对话，更新 title =====
 	if created && request.Content != "" {
 		title := request.Content
 		if len([]rune(title)) > 30 {
@@ -510,6 +600,11 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 
 	return nil
+}
+
+// ptrStatus returns a pointer to an AIMessageStatus for use in update structs.
+func ptrStatus(s store.AIMessageStatus) *store.AIMessageStatus {
+	return &s
 }
 
 // ========== 转换函数 ==========
