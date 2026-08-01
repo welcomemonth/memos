@@ -29,6 +29,7 @@ type APIV1Service struct {
 	v1pb.UnimplementedShortcutServiceServer
 	v1pb.UnimplementedIdentityProviderServiceServer
 	v1pb.UnimplementedKnowledgeServiceServer
+	v1pb.UnimplementedAIConversationServiceServer
 
 	Secret                  string
 	Profile                 *profile.Profile
@@ -125,6 +126,10 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 		return err
 	}
 	if err := v1pb.RegisterKnowledgeServiceHandlerServer(ctx, gwMux, s); err != nil {
+		return err
+	}
+
+	if err := v1pb.RegisterAIConversationServiceHandlerServer(ctx, gwMux, s); err != nil {
 		return err
 	}
 

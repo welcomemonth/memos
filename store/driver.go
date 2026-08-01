@@ -93,4 +93,16 @@ type Driver interface {
 	ListKBDocuments(ctx context.Context, find *FindKBDocument) ([]*KBDocument, error)
 	UpdateKBDocument(ctx context.Context, update *UpdateKBDocument) error
 	DeleteKBDocument(ctx context.Context, delete *DeleteKBDocument) error
+
+	// AIConversation model related methods.
+	CreateAIConversation(ctx context.Context, create *AIConversation) (*AIConversation, error)
+	ListAIConversations(ctx context.Context, find *FindAIConversation) ([]*AIConversation, error)
+	UpdateAIConversation(ctx context.Context, update *UpdateAIConversation) error
+	DeleteAIConversation(ctx context.Context, id int32) error
+
+	// AIMessage model related methods.
+	CreateAIMessage(ctx context.Context, create *AIMessage) (*AIMessage, error)
+	ListAIMessages(ctx context.Context, find *FindAIMessage) ([]*AIMessage, error)
+	UpdateAIMessage(ctx context.Context, update *UpdateAIMessage) error
+	DeleteAIMessage(ctx context.Context, id int32) error
 }

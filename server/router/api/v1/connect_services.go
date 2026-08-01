@@ -598,3 +598,75 @@ func (s *ConnectServiceHandler) DeleteIdentityProvider(ctx context.Context, req 
 	}
 	return connect.NewResponse(resp), nil
 }
+
+// AIConversationService
+
+func (s *ConnectServiceHandler) ListConversations(ctx context.Context, req *connect.Request[v1pb.ListConversationsRequest]) (*connect.Response[v1pb.ListConversationsResponse], error) {
+	resp, err := s.APIV1Service.ListConversations(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) GetConversation(ctx context.Context, req *connect.Request[v1pb.GetConversationRequest]) (*connect.Response[v1pb.AIConversation], error) {
+	resp, err := s.APIV1Service.GetConversation(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) UpdateConversation(ctx context.Context, req *connect.Request[v1pb.UpdateConversationRequest]) (*connect.Response[v1pb.AIConversation], error) {
+	resp, err := s.APIV1Service.UpdateConversation(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) DeleteConversation(ctx context.Context, req *connect.Request[v1pb.DeleteConversationRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.DeleteConversation(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ListMessages(ctx context.Context, req *connect.Request[v1pb.ListMessagesRequest]) (*connect.Response[v1pb.ListMessagesResponse], error) {
+	resp, err := s.APIV1Service.ListMessages(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) GetMessage(ctx context.Context, req *connect.Request[v1pb.GetMessageRequest]) (*connect.Response[v1pb.AIMessage], error) {
+	resp, err := s.APIV1Service.GetMessage(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) DeleteMessage(ctx context.Context, req *connect.Request[v1pb.DeleteMessageRequest]) (*connect.Response[emptypb.Empty], error) {
+	resp, err := s.APIV1Service.DeleteMessage(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) SendMessage(ctx context.Context, req *connect.Request[v1pb.SendMessageRequest]) (*connect.Response[v1pb.SendMessageResponse], error) {
+	resp, err := s.APIV1Service.SendMessage(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) StreamMessage(ctx context.Context, req *connect.Request[v1pb.StreamMessageRequest], stream *connect.ServerStream[v1pb.StreamMessageEvent]) error {
+	// TODO: Implement streaming adapter
+	// This requires converting between connect.ServerStream and grpc.ServerStreamingServer
+	return nil
+}

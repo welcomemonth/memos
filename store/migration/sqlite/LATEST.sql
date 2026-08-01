@@ -152,3 +152,34 @@ CREATE TABLE kb_document (
 
 CREATE INDEX idx_kb_document_knowledge_base_id ON kb_document(knowledge_base_id);
 CREATE INDEX idx_knowledge_base_creator_id ON knowledge_base(creator_id);
+
+-- ai_conversation
+CREATE TABLE ai_conversation (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT NOT NULL UNIQUE,
+  creator_id INTEGER NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  model TEXT NOT NULL DEFAULT '',
+  created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+CREATE INDEX idx_ai_conversation_creator_id ON ai_conversation(creator_id);
+
+-- ai_message
+CREATE TABLE ai_message (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid TEXT NOT NULL UNIQUE,
+  conversation_id INTEGER NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user','assistant','tool','system')) DEFAULT 'user',
+  status TEXT NOT NULL CHECK (status IN ('pending','completed','error','cancelled')) DEFAULT 'pending',
+  content TEXT NOT NULL DEFAULT '',
+  model TEXT NOT NULL DEFAULT '',
+  parent_message_uid TEXT NOT NULL DEFAULT '',
+  tokens_used INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT NOT NULL DEFAULT '',
+  payload TEXT NOT NULL DEFAULT '{}',
+  created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  FOREIGN KEY (conversation_id) REFERENCES ai_conversation(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_ai_message_conversation_id ON ai_message(conversation_id);
