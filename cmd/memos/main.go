@@ -10,9 +10,13 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	ccb "github.com/cloudwego/eino-ext/callbacks/cozeloop"
+	"github.com/cloudwego/eino/callbacks"
+	"github.com/coze-dev/cozeloop-go"
 	"github.com/usememos/memos/internal/profile"
 	"github.com/usememos/memos/internal/version"
 	"github.com/usememos/memos/internal/webhook"
@@ -112,7 +116,10 @@ var (
 
 func init() {
 	cobra.OnInitialize(initSlogDefault)
-
+	err := godotenv.Load(".env")
+	if err != nil {
+		panic("not found .env file")
+	}
 	viper.SetDefault("demo", false)
 	viper.SetDefault("driver", "sqlite")
 	viper.SetDefault("port", 8081)
@@ -200,6 +207,16 @@ func printGreetings(profile *profile.Profile) {
 }
 
 func main() {
+	ctx := context.Background()
+	client, err := cozeloop.NewClient()
+	if err != nil {
+		panic(err)
+	}
+	defer client.Close(ctx)
+	// 在服务 init 时 once 调用
+	handler := ccb.NewLoopHandler(client)
+	callbacks.AppendGlobalHandlers(handler)
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
