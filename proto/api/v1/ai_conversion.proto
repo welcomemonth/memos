@@ -1,0 +1,362 @@
+syntax = "proto3";
+
+package memos.api.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "gen/api/v1";
+
+// AIConversationService provides APIs for managing AI chat conversations and messages.
+//
+// Conversations are lazily created: the first SendMessage / StreamMessage call
+// with a new parent name will auto-create the conversation. There is no
+// explicit CreateConversation API. The conversation title is auto-generated
+// from the first user message; it can be overridden via UpdateConversation.
+service AIConversationService {
+  // ========== 会话 ==========
+
+  rpc ListConversations(ListConversationsRequest) returns (ListConversationsResponse) {
+    option (google.api.http) = {get: "/api/v1/ai/conversations"};
+  }
+
+  rpc GetConversation(GetConversationRequest) returns (AIConversation) {
+    option (google.api.http) = {get: "/api/v1/ai/conversations/{name=ai/conversations/*}"};
+  }
+
+  // UpdateConversation updates a conversation. Currently only the title field
+  // can be modified.
+  rpc UpdateConversation(UpdateConversationRequest) returns (AIConversation) {
+    option (google.api.http) = {
+      patch: "/api/v1/ai/conversations/{conversation.name=ai/conversations/*}"
+      body: "conversation"
+    };
+  }
+
+  rpc DeleteConversation(DeleteConversationRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/ai/conversations/{name=ai/conversations/*}"};
+  }
+
+  // ========== 消息 ==========
+
+  // ListMessages lists all messages in a conversation.
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse) {
+    option (google.api.http) = {get: "/api/v1/ai/conversations/{parent=ai/conversations/*}/messages"};
+  }
+
+  rpc GetMessage(GetMessageRequest) returns (AIMessage) {
+    option (google.api.http) = {get: "/api/v1/ai/messages/{name=ai/messages/*}"};
+  }
+
+  rpc DeleteMessage(DeleteMessageRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/ai/messages/{name=ai/messages/*}"};
+  }
+
+  // ========== 对话（发送消息 & 获取 AI 回复）==========
+
+  // SendMessage sends a user message and returns the assistant reply.
+  //
+  // If the conversation identified by `parent` does not exist, it will be
+  // created automatically. The response includes the (possibly new)
+  // conversation so the client can record the backend-assigned name.
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/conversations/{parent=ai/conversations/*}:sendMessage"
+      body: "*"
+    };
+  }
+
+  // StreamMessage sends a user message and streams the assistant reply.
+  //
+  // If the conversation does not exist, a ConversationCreated event is
+  // emitted as the first frame before any content deltas.
+  // Uses Connect server-streaming.
+  rpc StreamMessage(StreamMessageRequest) returns (stream StreamMessageEvent) {
+    option (google.api.http) = {
+      post: "/api/v1/ai/conversations/{parent=ai/conversations/*}:streamMessage"
+      body: "*"
+    };
+  }
+}
+
+// ========== Conversation messages ==========
+
+message AIConversation {
+  // Resource name: ai/conversations/{uid}
+  string name = 1;
+  // Title — auto-generated from the first user message, can be overridden
+  // via UpdateConversation.
+  string title = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+  // Default model for new messages in this conversation. Individual messages
+  // may override via SendMessageRequest.model.
+  string model = 3;
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 5 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ListConversationsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListConversationsResponse {
+  repeated AIConversation conversations = 1;
+  string next_page_token = 2;
+}
+
+message GetConversationRequest {
+  // ai/conversations/{uid}
+  string name = 1;
+}
+
+message UpdateConversationRequest {
+  AIConversation conversation = 1 [(google.api.field_behavior) = REQUIRED];
+  // Only "title" is currently updatable.
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message DeleteConversationRequest {
+  // ai/conversations/{uid}
+  string name = 1;
+}
+
+// ========== Message messages ==========
+
+message AIMessage {
+  // Resource name: ai/messages/{uid}
+  string name = 1;
+  // Parent conversation: ai/conversations/{uid}
+  string parent = 2 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  Role role = 3;
+  Status status = 4;
+
+  // Main content (Markdown).
+  string content = 5;
+
+  // Reasoning / thinking segments.
+  repeated ReasoningItem reasoning_items = 6;
+
+  // Tool calls made by the assistant in this message.
+  repeated ToolCall tool_calls = 7;
+
+  // Attached files (images, documents, etc.).
+  repeated MessageAttachment attachments = 8;
+
+  // Web search results referenced by the assistant.
+  repeated SearchResult search_results = 9;
+
+  // The model that actually produced this message.
+  string model = 10;
+
+  // Parent message name (for branching / regeneration).
+  string parent_message = 11;
+
+  // Token usage.
+  int32 tokens_used = 12;
+
+  // Error detail when status is ERROR.
+  string error_message = 13;
+
+  google.protobuf.Timestamp create_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  enum Role {
+    ROLE_UNSPECIFIED = 0;
+    USER = 1;
+    ASSISTANT = 2;
+    TOOL = 3;
+    SYSTEM = 4;
+  }
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    PENDING = 1;
+    COMPLETED = 2;
+    ERROR = 3;
+    CANCELLED = 4;
+  }
+}
+
+message ReasoningItem {
+  string content = 1;
+  int32 duration_ms = 2;
+  int32 tokens = 3;
+  google.protobuf.Timestamp create_time = 4 [(google.api.field_behavior) = OUTPUT_ONLY];
+}
+
+message ToolCall {
+  string id = 1;
+  string name = 2;
+  string arguments = 3;   // JSON string
+  string result = 4;
+  ToolCallStatus status = 5;
+  int32 duration_ms = 6;
+  string error_message = 7;
+  google.protobuf.Timestamp create_time = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
+  google.protobuf.Timestamp update_time = 9 [(google.api.field_behavior) = OUTPUT_ONLY];
+
+  enum ToolCallStatus {
+    TOOL_CALL_STATUS_UNSPECIFIED = 0;
+    TOOL_CALL_PENDING = 1;
+    TOOL_CALL_RUNNING = 2;
+    TOOL_CALL_COMPLETED = 3;
+    TOOL_CALL_FAILED = 4;
+  }
+}
+
+message MessageAttachment {
+  string name = 1;           // Resource name or ID
+  string filename = 2;
+  string content_type = 3;   // MIME type
+  int64 size = 4;
+  string uri = 5;            // Download URI
+  AttachmentType type = 6;
+
+  enum AttachmentType {
+    ATTACHMENT_TYPE_UNSPECIFIED = 0;
+    IMAGE = 1;
+    FILE = 2;
+    VIDEO = 3;
+    AUDIO = 4;
+  }
+}
+
+message SearchResult {
+  string title = 1;
+  string uri = 2;
+  string snippet = 3;
+  string source = 4;
+}
+
+// ========== Message request/response ==========
+
+message ListMessagesRequest {
+  // ai/conversations/{uid}
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  // Optional: only return messages after this message name.
+  string after_message = 4;
+}
+
+message ListMessagesResponse {
+  repeated AIMessage messages = 1;
+  string next_page_token = 2;
+}
+
+message GetMessageRequest {
+  // ai/messages/{uid}
+  string name = 1;
+}
+
+message DeleteMessageRequest {
+  // ai/messages/{uid}
+  string name = 1;
+}
+
+// ========== Send / Stream ==========
+
+message SendMessageRequest {
+  // ai/conversations/{uid} — if the conversation does not exist it will be
+  // created automatically. The frontend generates a UUID for new conversations.
+  string parent = 1;
+  // The user message content (plain text or Markdown).
+  string content = 2 [(google.api.field_behavior) = REQUIRED];
+  // Optional: files/images to attach.
+  repeated MessageAttachment attachments = 3;
+  // Optional: model to use for this turn. Falls back to conversation.model
+  // when empty.
+  string model = 4;
+  // Optional: parent message name (for branching / regeneration).
+  string parent_message = 5;
+}
+
+// SendMessageResponse returns both the assistant reply and the conversation
+// it belongs to. This way the client always learns the backend-assigned
+// conversation name, even when the conversation was just created.
+message SendMessageResponse {
+  AIMessage message = 1;
+  AIConversation conversation = 2;
+}
+
+message StreamMessageRequest {
+  // Same semantics as SendMessageRequest.parent.
+  string parent = 1;
+  string content = 2 [(google.api.field_behavior) = REQUIRED];
+  repeated MessageAttachment attachments = 3;
+  string model = 4;
+  string parent_message = 5;
+}
+
+// StreamMessageEvent is one frame in the server-streaming response.
+// Exactly one of the fields below will be set per event.
+message StreamMessageEvent {
+  oneof event {
+    // Emitted when a new conversation is auto-created (always the first
+    // event if the conversation did not previously exist).
+    ConversationCreated conversation_created = 1;
+    // A delta of the assistant's reasoning/thinking output.
+    ReasoningDelta reasoning = 2;
+    // A delta of the assistant's main content.
+    ContentDelta content = 3;
+    // A tool call is starting.
+    ToolCallStart tool_call_start = 4;
+    // A delta of a tool call's arguments (streaming JSON).
+    ToolCallDelta tool_call_delta = 5;
+    // A tool call has finished with its result.
+    ToolCallEnd tool_call_end = 6;
+    // The stream is complete; includes final message metadata.
+    StreamDone done = 7;
+    // An error occurred during streaming.
+    StreamError error = 8;
+  }
+}
+
+message ConversationCreated {
+  // The backend-assigned conversation resource name: ai/conversations/{uid}
+  string name = 1;
+  string title = 2;
+  string model = 3;
+}
+
+message ReasoningDelta {
+  string delta = 1;  // incremental reasoning text
+}
+
+message ContentDelta {
+  string delta = 1;  // incremental content text
+}
+
+message ToolCallStart {
+  string tool_call_id = 1;
+  string name = 2;
+}
+
+message ToolCallDelta {
+  string tool_call_id = 1;
+  string arguments_delta = 2;  // incremental JSON fragment
+}
+
+message ToolCallEnd {
+  string tool_call_id = 1;
+  string result = 2;
+  ToolCall.ToolCallStatus status = 3;
+  string error_message = 4;
+  int32 duration_ms = 5;
+}
+
+message StreamDone {
+  // The completed assistant message resource name: ai/messages/{uid}
+  string message_name = 1;
+  int32 tokens_used = 2;
+  string model = 3;
+}
+
+message StreamError {
+  string message = 1;
+  string code = 2;
+}
