@@ -10,7 +10,7 @@ import (
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 )
 
-var fields = []*entity.Field{
+var Fields = []*entity.Field{
 	{
 		Name:     "id",
 		DataType: entity.FieldTypeVarChar,
@@ -39,13 +39,27 @@ var fields = []*entity.Field{
 	},
 }
 
+var SharedClient MilvusClient
+
+func init() {
+	ctx := context.Background()
+	client, err := NewMilvusClient(ctx)
+	if err != nil {
+		panic(err)
+	}
+	SharedClient = *client
+}
+
 type MilvusClient struct {
-	client cli.Client
+	client         cli.Client
+	collectionName string
 }
 
 func NewMilvusClient(ctx context.Context) (*MilvusClient, error) {
 	DBName := os.Getenv("MILVUS_DBNAME")
 	Address := os.Getenv("MILVUS_ADDRESS")
+	CollectionName := os.Getenv("MILVUS_COLLECTION")
+
 	if DBName == "" || Address == "" {
 		return nil, fmt.Errorf("DBName or Address is empty")
 	}
@@ -85,9 +99,75 @@ func NewMilvusClient(ctx context.Context) (*MilvusClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to %s database: %w", DBName, err)
 	}
+	// 4、创建collection，使用一个collection + 多个partition
+	collections, err := knowledgeClient.ListCollections(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list collections: %w", err)
+	}
+	knowledgeCollectionExists := false
+	for _, collection := range collections {
+		if collection.Name == CollectionName {
+			knowledgeCollectionExists = true
+			break
+		}
+	}
+
+	if !knowledgeCollectionExists {
+		// 创建biz collection的schema
+		schema := &entity.Schema{
+			CollectionName: CollectionName,
+			Description:    "Business knowledge collection",
+			Fields:         Fields,
+		}
+
+		err = knowledgeClient.CreateCollection(ctx, schema, entity.DefaultShardNumber)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create biz collection: %w", err)
+		}
+
+		// 为id字段创建autoindex索引
+		idIndex, err := entity.NewIndexAUTOINDEX(entity.L2)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create id index: %w", err)
+		}
+		err = knowledgeClient.CreateIndex(ctx, CollectionName, "id", idIndex, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create id index: %w", err)
+		}
+
+		// 为content字段创建autoindex索引
+		contentIndex, err := entity.NewIndexAUTOINDEX(entity.L2)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create content index: %w", err)
+		}
+		err = knowledgeClient.CreateIndex(ctx, CollectionName, "content", contentIndex, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create content index: %w", err)
+		}
+
+		// 为vector字段创建autoindex索引
+		vectorIndex, err := entity.NewIndexAUTOINDEX(entity.HAMMING)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create vector index: %w", err)
+		}
+		err = knowledgeClient.CreateIndex(ctx, CollectionName, "vector", vectorIndex, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create vector index: %w", err)
+		}
+	}
+
 	return &MilvusClient{
-		client: knowledgeClient,
+		client:         knowledgeClient,
+		collectionName: CollectionName,
 	}, nil
+}
+
+func (m *MilvusClient) Client() cli.Client {
+	return m.client
+}
+
+func (m *MilvusClient) CollectionName() string {
+	return m.collectionName
 }
 
 // FIXME 这个返回的该是什么？
@@ -95,7 +175,7 @@ func (m *MilvusClient) CreateCollection(ctx context.Context, collectionName stri
 	schema := &entity.Schema{
 		CollectionName: collectionName,
 		Description:    "Business knowledge collection",
-		Fields:         fields,
+		Fields:         Fields,
 	}
 	err := m.client.CreateCollection(ctx, schema, entity.DefaultShardNumber)
 	if err != nil {
