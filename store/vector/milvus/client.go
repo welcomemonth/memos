@@ -21,9 +21,9 @@ var Fields = []*entity.Field{
 	},
 	{
 		Name:     "vector", // 确保字段名匹配
-		DataType: entity.FieldTypeBinaryVector,
+		DataType: entity.FieldTypeFloatVector,
 		TypeParams: map[string]string{
-			"dim": "65536",
+			"dim": "1024",
 		},
 	},
 	{
@@ -34,6 +34,13 @@ var Fields = []*entity.Field{
 		},
 	},
 	{
+		Name:     "file_uuid",
+		DataType: entity.FieldTypeVarChar,
+		TypeParams: map[string]string{
+			"max_length": "64",
+		},
+	},
+	{
 		Name:     "metadata",
 		DataType: entity.FieldTypeJSON,
 	},
@@ -41,8 +48,7 @@ var Fields = []*entity.Field{
 
 var SharedClient MilvusClient
 
-func init() {
-	ctx := context.Background()
+func InitMilvusClient(ctx context.Context) {
 	client, err := NewMilvusClient(ctx)
 	if err != nil {
 		panic(err)
@@ -146,13 +152,23 @@ func NewMilvusClient(ctx context.Context) (*MilvusClient, error) {
 		}
 
 		// 为vector字段创建autoindex索引
-		vectorIndex, err := entity.NewIndexAUTOINDEX(entity.HAMMING)
+		vectorIndex, err := entity.NewIndexAUTOINDEX(entity.COSINE)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create vector index: %w", err)
 		}
 		err = knowledgeClient.CreateIndex(ctx, CollectionName, "vector", vectorIndex, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create vector index: %w", err)
+		}
+
+		// 为file_uuid字段创建索引
+		fileUUIDIndex, err := entity.NewIndexAUTOINDEX(entity.L2)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file_uuid index: %w", err)
+		}
+		err = knowledgeClient.CreateIndex(ctx, CollectionName, "file_uuid", fileUUIDIndex, false)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file_uuid index: %w", err)
 		}
 	}
 
@@ -202,7 +218,7 @@ func (m *MilvusClient) CreateCollection(ctx context.Context, collectionName stri
 	}
 
 	// 为vector字段创建autoindex索引
-	vectorIndex, err := entity.NewIndexAUTOINDEX(entity.HAMMING)
+	vectorIndex, err := entity.NewIndexAUTOINDEX(entity.COSINE)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vector index: %w", err)
 	}
