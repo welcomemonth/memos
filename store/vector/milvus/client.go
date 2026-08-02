@@ -1,0 +1,134 @@
+package milvus
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+
+	cli "github.com/milvus-io/milvus-sdk-go/v2/client"
+	"github.com/milvus-io/milvus-sdk-go/v2/entity"
+)
+
+var fields = []*entity.Field{
+	{
+		Name:     "id",
+		DataType: entity.FieldTypeVarChar,
+		TypeParams: map[string]string{
+			"max_length": "256",
+		},
+		PrimaryKey: true,
+	},
+	{
+		Name:     "vector", // 确保字段名匹配
+		DataType: entity.FieldTypeBinaryVector,
+		TypeParams: map[string]string{
+			"dim": "65536",
+		},
+	},
+	{
+		Name:     "content",
+		DataType: entity.FieldTypeVarChar,
+		TypeParams: map[string]string{
+			"max_length": "8192",
+		},
+	},
+	{
+		Name:     "metadata",
+		DataType: entity.FieldTypeJSON,
+	},
+}
+
+type MilvusClient struct {
+	client cli.Client
+}
+
+func NewMilvusClient(ctx context.Context) (*MilvusClient, error) {
+	DBName := os.Getenv("MILVUS_DBNAME")
+	Address := os.Getenv("MILVUS_ADDRESS")
+	if DBName == "" || Address == "" {
+		return nil, fmt.Errorf("DBName or Address is empty")
+	}
+	// 1、先尝试链接default数据
+	defaultClient, err := cli.NewClient(ctx, cli.Config{
+		Address: Address,
+		DBName:  "default",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to default database: %w", err)
+	}
+	defer defaultClient.Close()
+	// 2、检查env中填写的数据库名称是否存在，不存在则创建
+	databases, err := defaultClient.ListDatabases(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list databases: %w", err)
+	}
+	slog.Info("milvus databases= ", databases)
+	knowledgeDBExists := false
+	for _, db := range databases {
+		if db.Name == DBName {
+			knowledgeDBExists = true
+			break
+		}
+	}
+	if !knowledgeDBExists {
+		err = defaultClient.CreateDatabase(ctx, DBName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create %s database: %w", DBName, err)
+		}
+	}
+	// 3、创建链接到knowledge数据库的客户端
+	knowledgeClient, err := cli.NewClient(ctx, cli.Config{
+		Address: Address,
+		DBName:  DBName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to %s database: %w", DBName, err)
+	}
+	return &MilvusClient{
+		client: knowledgeClient,
+	}, nil
+}
+
+// FIXME 这个返回的该是什么？
+func (m *MilvusClient) CreateCollection(ctx context.Context, collectionName string) (error, error) {
+	schema := &entity.Schema{
+		CollectionName: collectionName,
+		Description:    "Business knowledge collection",
+		Fields:         fields,
+	}
+	err := m.client.CreateCollection(ctx, schema, entity.DefaultShardNumber)
+	if err != nil {
+		return nil, fmt.Errorf("filed to create collection: %w", err)
+	}
+	// 为id字段创建autoindex索引
+	idIndex, err := entity.NewIndexAUTOINDEX(entity.L2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create id index: %w", err)
+	}
+	err = m.client.CreateIndex(ctx, collectionName, "id", idIndex, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create id index: %w", err)
+	}
+
+	// 为content字段创建autoindex索引
+	contentIndex, err := entity.NewIndexAUTOINDEX(entity.L2)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create content index: %w", err)
+	}
+	err = m.client.CreateIndex(ctx, collectionName, "content", contentIndex, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create content index: %w", err)
+	}
+
+	// 为vector字段创建autoindex索引
+	vectorIndex, err := entity.NewIndexAUTOINDEX(entity.HAMMING)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vector index: %w", err)
+	}
+	err = m.client.CreateIndex(ctx, collectionName, "vector", vectorIndex, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vector index: %w", err)
+	}
+	return nil, nil
+}
