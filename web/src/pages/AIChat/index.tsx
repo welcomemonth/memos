@@ -161,10 +161,13 @@ const AIChat = () => {
       setStreamingReasoning("");
       streamingConvIdRef.current = convName;
 
+      console.log("[send] selectedKnowledgeBases=", selectedKnowledgeBases);
+      // 知识库 name 形如 "knowledgebases/{uid}"，partitionId 只取 uid 部分。
+      const partitionUid = (selectedKnowledgeBases[0] ?? "").replace(/^knowledgebases\//, "");
       await streamMessage(
         convName,
         content,
-        selectedKnowledgeBases[0] ?? "",
+        partitionUid,
         (event: StreamEvent) => {
           if (event.conversationCreated) {
             const serverName = event.conversationCreated.name;
@@ -233,7 +236,7 @@ const AIChat = () => {
         },
       );
     },
-    [activeConvId, isStreaming, loadConversations],
+    [activeConvId, isStreaming, loadConversations, selectedKnowledgeBases],
   );
 
   // Refs to track latest streaming state for the done handler (avoid stale closures)

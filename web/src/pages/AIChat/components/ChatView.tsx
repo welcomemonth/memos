@@ -101,9 +101,11 @@ const ChatView = ({
 
   const toggleKnowledgeBase = useCallback(
     (name: string) => {
+      console.log("[toggleKnowledgeBase] clicked:", name, "current:", selectedKnowledgeBases);
       const next = selectedKnowledgeBases.includes(name)
         ? selectedKnowledgeBases.filter((n) => n !== name)
         : [...selectedKnowledgeBases, name];
+      console.log("[toggleKnowledgeBase] next:", next);
       onSelectedKnowledgeBasesChange(next);
     },
     [selectedKnowledgeBases, onSelectedKnowledgeBasesChange],
