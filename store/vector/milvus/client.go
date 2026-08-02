@@ -34,13 +34,6 @@ var Fields = []*entity.Field{
 		},
 	},
 	{
-		Name:     "file_uuid",
-		DataType: entity.FieldTypeVarChar,
-		TypeParams: map[string]string{
-			"max_length": "64",
-		},
-	},
-	{
 		Name:     "metadata",
 		DataType: entity.FieldTypeJSON,
 	},
@@ -160,16 +153,6 @@ func NewMilvusClient(ctx context.Context) (*MilvusClient, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to create vector index: %w", err)
 		}
-
-		// 为file_uuid字段创建索引
-		fileUUIDIndex, err := entity.NewIndexAUTOINDEX(entity.L2)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create file_uuid index: %w", err)
-		}
-		err = knowledgeClient.CreateIndex(ctx, CollectionName, "file_uuid", fileUUIDIndex, false)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create file_uuid index: %w", err)
-		}
 	}
 
 	return &MilvusClient{
@@ -186,7 +169,22 @@ func (m *MilvusClient) CollectionName() string {
 	return m.collectionName
 }
 
-// FIXME 这个返回的该是什么？
+// 判断collection中的partition是否存在，不存在则创建
+func (m *MilvusClient) CreatePartition(ctx context.Context, partitionName string) error {
+	collectionName := m.CollectionName()
+	hasPartition, err := m.client.HasPartition(ctx, collectionName, partitionName)
+	if err != nil {
+		return err
+	}
+	if !hasPartition {
+		if err := m.client.CreatePartition(ctx, collectionName, partitionName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// FIXME 这个返回的该是什么？暂时没有用，因为使用统一的collection
 func (m *MilvusClient) CreateCollection(ctx context.Context, collectionName string) (error, error) {
 	schema := &entity.Schema{
 		CollectionName: collectionName,

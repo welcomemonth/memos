@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
@@ -23,6 +24,7 @@ import (
 	"github.com/usememos/memos/server"
 	"github.com/usememos/memos/store"
 	"github.com/usememos/memos/store/db"
+	"github.com/usememos/memos/store/vector/milvus"
 )
 
 func initSlogDefault() {
@@ -207,7 +209,9 @@ func printGreetings(profile *profile.Profile) {
 }
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	// 1、初始化coze罗盘，用户追踪AI问答的过程
 	client, err := cozeloop.NewClient()
 	if err != nil {
 		panic(err)
@@ -216,6 +220,9 @@ func main() {
 	// 在服务 init 时 once 调用
 	handler := ccb.NewLoopHandler(client)
 	callbacks.AppendGlobalHandlers(handler)
+
+	// 2、初始向量数据库
+	milvus.InitMilvusClient(ctx)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)

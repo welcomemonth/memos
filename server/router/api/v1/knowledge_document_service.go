@@ -4,12 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudwego/eino-ext/components/indexer/milvus"
+	"github.com/cloudwego/eino/components/document"
+	"github.com/cloudwego/eino/compose"
+	"github.com/usememos/memos/eino/knowledge"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
+	mymilvus "github.com/usememos/memos/store/vector/milvus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -99,6 +105,26 @@ func (s *APIV1Service) UploadDocument(ctx context.Context, request *v1pb.UploadD
 		os.Remove(absPath)
 		return nil, status.Errorf(codes.Internal, "failed to create document: %v", err)
 	}
+	slog.Debug("upload file absPath:", absPath)
+	// TODO 应该是异步开始处理文档，这里先同步执行
+	r, err := knowledge.BuildKnowledgeIndexing(ctx)
+	if err != nil {
+		// return nil, status.Errorf(codes.Internal, "failed to handle document: %v", err)
+		slog.Error("failed to handle document: %v", err)
+	}
+
+	// 创建 partition（如果不存在）
+	err = mymilvus.SharedClient.CreatePartition(ctx, kbUID)
+	if err != nil {
+		slog.Error("failed to create Partition: %v", err)
+	} else {
+		ids, err := r.Invoke(ctx, document.Source{URI: absPath}, compose.WithIndexerOption(milvus.WithPartition(kbUID)))
+		if err != nil {
+			slog.Error("failed to handle document: %v", err)
+		}
+		slog.Info("document ids: ", ids)
+	}
+
 	return convertDocumentToPb(kb.UID, doc), nil
 }
 
