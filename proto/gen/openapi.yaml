@@ -4251,6 +4251,12 @@ components:
                 parentMessage:
                     type: string
                     description: 'Optional: parent message name (for branching / regeneration).'
+                partitionId:
+                    type: string
+                    description: |-
+                        Optional: knowledge-base partition id. When set, the backend retrieves
+                         relevant documents from this partition and injects them as RAG context
+                         for the current turn.
         SendMessageResponse:
             type: object
             properties:
@@ -4487,6 +4493,12 @@ components:
                     type: string
                 parentMessage:
                     type: string
+                partitionId:
+                    type: string
+                    description: |-
+                        Optional: knowledge-base partition id. When set, the backend retrieves
+                         relevant documents from this partition and injects them as RAG context
+                         for the current turn.
         TestInstanceEmailSettingRequest:
             type: object
             properties:

@@ -9,7 +9,7 @@ import {
   generateConversationId,
   type StreamEvent,
 } from "@/lib/aiChat";
-import { AIMessage_Role } from "@/types/proto/api/v1/ai_conversion_pb";
+import { AIMessage_Role } from "@/types/proto/api/v1/ai_conversion_service_pb";
 import { Routes } from "@/router";
 import ChatView from "./components/ChatView";
 import Sidebar from "./components/Sidebar";
@@ -164,6 +164,7 @@ const AIChat = () => {
       await streamMessage(
         convName,
         content,
+        selectedKnowledgeBases[0] ?? "",
         (event: StreamEvent) => {
           if (event.conversationCreated) {
             const serverName = event.conversationCreated.name;

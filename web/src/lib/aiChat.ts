@@ -1,13 +1,12 @@
 import { aiConversationServiceClient } from "@/connect";
-import type { AIConversation, AIMessage, StreamMessageEvent } from "@/types/proto/api/v1/ai_conversion_pb";
+import type { AIConversation, AIMessage } from "@/types/proto/api/v1/ai_conversion_service_pb";
 import {
   ListConversationsRequestSchema,
   ListMessagesRequestSchema,
-  SendMessageRequestSchema,
   StreamMessageRequestSchema,
   UpdateConversationRequestSchema,
   DeleteConversationRequestSchema,
-} from "@/types/proto/api/v1/ai_conversion_pb";
+} from "@/types/proto/api/v1/ai_conversion_service_pb";
 import { create } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 
@@ -52,16 +51,19 @@ export async function listMessages(conversationName: string): Promise<AIMessage[
 export async function streamMessage(
   conversationName: string,
   content: string,
+  partitionId: string,
   onEvent: (event: StreamEvent) => void,
   onError?: (error: Error) => void,
   onComplete?: () => void,
 ): Promise<void> {
   try {
-    console.log("[streamMessage] start", { conversationName, content });
+    console.log("[streamMessage] start", { conversationName, content, partitionId });
     const request = create(StreamMessageRequestSchema, {
       parent: conversationName,
       content,
+      partitionId,
     });
+    console.log("[streamMessage] request built", { partitionId: request.partitionId, parent: request.parent });
 
     // 使用 Connect 协议的 server-streaming
     const stream = aiConversationServiceClient.streamMessage(request);

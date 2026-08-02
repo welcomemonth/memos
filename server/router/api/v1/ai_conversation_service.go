@@ -351,7 +351,7 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *v1pb.SendMessag
 	}
 
 	// 调用 Eino 框架获取 AI 回复
-	assistantContent, err := callEinoChat(ctx, request.Content)
+	assistantContent, err := callEinoChat(ctx, request.Content, request.PartitionId)
 	if err != nil {
 		slog.Error("Failed to call Eino chat", "error", err)
 		assistantContent = "抱歉，AI 服务暂时不可用：" + err.Error()
@@ -403,7 +403,7 @@ func (s *APIV1Service) SendMessage(ctx context.Context, request *v1pb.SendMessag
 //	流结束后：先创建 assistant message 到 DB → 发送 StreamDone → 更新 conversation title
 func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream grpc.ServerStreamingServer[v1pb.StreamMessageEvent]) error {
 	ctx := stream.Context()
-
+	slog.Debug("request data= ", "req", request, "partitionId", request.PartitionId)
 	// ===== 1. 鉴权 =====
 	user, err := s.fetchCurrentUser(ctx)
 	if err != nil {
@@ -513,8 +513,9 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 
 	streamReader, err := runner.Stream(ctx, map[string]any{
-		"question": request.Content,
-		"history":  history,
+		"question":    request.Content,
+		"history":     history,
+		"partitionId": request.PartitionId,
 	})
 	if err != nil {
 		errMsg := "failed to start stream: " + err.Error()
@@ -773,7 +774,7 @@ func buildHistory(ctx context.Context, db *store.Store, conversationID int32, ex
 }
 
 // callEinoChat calls the Eino framework to get AI response
-func callEinoChat(ctx context.Context, question string) (string, error) {
+func callEinoChat(ctx context.Context, question, partitionID string) (string, error) {
 	// Build the chat chain
 	runner, err := chatChain.BuildchatChain(ctx)
 	if err != nil {
@@ -781,7 +782,11 @@ func callEinoChat(ctx context.Context, question string) (string, error) {
 	}
 
 	// Invoke the chain with the question
-	result, err := runner.Invoke(ctx, question)
+	result, err := runner.Invoke(ctx, map[string]any{
+		"question":    question,
+		"history":     []*schema.Message{},
+		"partitionId": partitionID,
+	})
 	if err != nil {
 		return "", err
 	}

@@ -273,6 +273,10 @@ message SendMessageRequest {
   string model = 4;
   // Optional: parent message name (for branching / regeneration).
   string parent_message = 5;
+  // Optional: knowledge-base partition id. When set, the backend retrieves
+  // relevant documents from this partition and injects them as RAG context
+  // for the current turn.
+  string partition_id = 6;
 }
 
 // SendMessageResponse returns both the assistant reply and the conversation
@@ -290,6 +294,10 @@ message StreamMessageRequest {
   repeated MessageAttachment attachments = 3;
   string model = 4;
   string parent_message = 5;
+  // Optional: knowledge-base partition id. When set, the backend retrieves
+  // relevant documents from this partition and injects them as RAG context
+  // for the current turn.
+  string partition_id = 6;
 }
 
 // StreamMessageEvent is one frame in the server-streaming response.

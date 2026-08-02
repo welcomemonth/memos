@@ -1294,6 +1294,10 @@ type SendMessageRequest struct {
 	Model string `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
 	// Optional: parent message name (for branching / regeneration).
 	ParentMessage string `protobuf:"bytes,5,opt,name=parent_message,json=parentMessage,proto3" json:"parent_message,omitempty"`
+	// Optional: knowledge-base partition id. When set, the backend retrieves
+	// relevant documents from this partition and injects them as RAG context
+	// for the current turn.
+	PartitionId   string `protobuf:"bytes,6,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1363,6 +1367,13 @@ func (x *SendMessageRequest) GetParentMessage() string {
 	return ""
 }
 
+func (x *SendMessageRequest) GetPartitionId() string {
+	if x != nil {
+		return x.PartitionId
+	}
+	return ""
+}
+
 // SendMessageResponse returns both the assistant reply and the conversation
 // it belongs to. This way the client always learns the backend-assigned
 // conversation name, even when the conversation was just created.
@@ -1426,6 +1437,10 @@ type StreamMessageRequest struct {
 	Attachments   []*MessageAttachment `protobuf:"bytes,3,rep,name=attachments,proto3" json:"attachments,omitempty"`
 	Model         string               `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
 	ParentMessage string               `protobuf:"bytes,5,opt,name=parent_message,json=parentMessage,proto3" json:"parent_message,omitempty"`
+	// Optional: knowledge-base partition id. When set, the backend retrieves
+	// relevant documents from this partition and injects them as RAG context
+	// for the current turn.
+	PartitionId   string `protobuf:"bytes,6,opt,name=partition_id,json=partitionId,proto3" json:"partition_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1491,6 +1506,13 @@ func (x *StreamMessageRequest) GetModel() string {
 func (x *StreamMessageRequest) GetParentMessage() string {
 	if x != nil {
 		return x.ParentMessage
+	}
+	return ""
+}
+
+func (x *StreamMessageRequest) GetPartitionId() string {
+	if x != nil {
+		return x.PartitionId
 	}
 	return ""
 }
@@ -2244,22 +2266,24 @@ const file_api_v1_ai_conversion_service_proto_rawDesc = "" +
 	"\x11GetMessageRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\"*\n" +
 	"\x14DeleteMessageRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"\xcb\x01\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\xee\x01\n" +
 	"\x12SendMessageRequest\x12\x16\n" +
 	"\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1d\n" +
 	"\acontent\x18\x02 \x01(\tB\x03\xe0A\x02R\acontent\x12A\n" +
 	"\vattachments\x18\x03 \x03(\v2\x1f.memos.api.v1.MessageAttachmentR\vattachments\x12\x14\n" +
 	"\x05model\x18\x04 \x01(\tR\x05model\x12%\n" +
-	"\x0eparent_message\x18\x05 \x01(\tR\rparentMessage\"\x8a\x01\n" +
+	"\x0eparent_message\x18\x05 \x01(\tR\rparentMessage\x12!\n" +
+	"\fpartition_id\x18\x06 \x01(\tR\vpartitionId\"\x8a\x01\n" +
 	"\x13SendMessageResponse\x121\n" +
 	"\amessage\x18\x01 \x01(\v2\x17.memos.api.v1.AIMessageR\amessage\x12@\n" +
-	"\fconversation\x18\x02 \x01(\v2\x1c.memos.api.v1.AIConversationR\fconversation\"\xcd\x01\n" +
+	"\fconversation\x18\x02 \x01(\v2\x1c.memos.api.v1.AIConversationR\fconversation\"\xf0\x01\n" +
 	"\x14StreamMessageRequest\x12\x16\n" +
 	"\x06parent\x18\x01 \x01(\tR\x06parent\x12\x1d\n" +
 	"\acontent\x18\x02 \x01(\tB\x03\xe0A\x02R\acontent\x12A\n" +
 	"\vattachments\x18\x03 \x03(\v2\x1f.memos.api.v1.MessageAttachmentR\vattachments\x12\x14\n" +
 	"\x05model\x18\x04 \x01(\tR\x05model\x12%\n" +
-	"\x0eparent_message\x18\x05 \x01(\tR\rparentMessage\"\x9d\x04\n" +
+	"\x0eparent_message\x18\x05 \x01(\tR\rparentMessage\x12!\n" +
+	"\fpartition_id\x18\x06 \x01(\tR\vpartitionId\"\x9d\x04\n" +
 	"\x12StreamMessageEvent\x12V\n" +
 	"\x14conversation_created\x18\x01 \x01(\v2!.memos.api.v1.ConversationCreatedH\x00R\x13conversationCreated\x12<\n" +
 	"\treasoning\x18\x02 \x01(\v2\x1c.memos.api.v1.ReasoningDeltaH\x00R\treasoning\x126\n" +
