@@ -9,16 +9,23 @@ import (
 	mymilvus "github.com/usememos/memos/store/vector/milvus"
 )
 
-func NewRetriever(ctx context.Context) (*milvus.Retriever, error) {
+func NewRetriever(ctx context.Context, partitionIds []string) (*milvus.Retriever, error) {
 	// 1、创建embedder
 	embedder, err := embedder.NewEmbedder(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	// 自定义 SearchParam，COSINE 距离的 radius 应该是很小的值
+	sp, _ := entity.NewIndexAUTOINDEXSearchParam(1)
+	sp.AddRadius(0.0)      // 搜索半径下限
+	sp.AddRangeFilter(2.0) // 范围过滤上限，COSINE 距离范围 [0, 2]
+
 	//2、创建检索节点
 	return milvus.NewRetriever(ctx, &milvus.RetrieverConfig{
 		Client:      mymilvus.SharedClient.Client(),
 		Collection:  mymilvus.SharedClient.CollectionName(),
+		MetricType:  entity.COSINE,
 		VectorField: "vector",
 		OutputFields: []string{
 			"id",
@@ -27,6 +34,7 @@ func NewRetriever(ctx context.Context) (*milvus.Retriever, error) {
 		},
 		TopK:            3,
 		Embedding:       embedder,
+		Sp:              sp,
 		VectorConverter: FloatConvertToDocument,
 	})
 }

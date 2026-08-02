@@ -27,7 +27,7 @@ func NewPreparePromptLambdaFunc(ctx context.Context, input map[string]any) (map[
 	partitionId, _ := input["partitionId"].(string)
 	reference := ""
 	if partitionId != "" && question != "" {
-		retriever, err := NewRetriever(ctx)
+		retriever, err := NewRetriever(ctx, []string{partitionId})
 		if err != nil {
 			slog.ErrorContext(ctx, "create retriever failed", "error", err)
 		} else {
@@ -35,6 +35,7 @@ func NewPreparePromptLambdaFunc(ctx context.Context, input map[string]any) (map[
 			if err != nil {
 				slog.WarnContext(ctx, "retrieve failed", "error", err, "question", question)
 			} else {
+				slog.Debug("retriever info: ", results)
 				reference = joinDocuments(results)
 			}
 		}
