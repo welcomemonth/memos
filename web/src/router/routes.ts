@@ -14,6 +14,7 @@ export const ROUTES = {
   BASE64: "/tools/base64",
   TIMESTAMP: "/tools/timestamp",
   AI_CHAT: "/chat",
+  KNOWLEDGE: "/knowledge",
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;

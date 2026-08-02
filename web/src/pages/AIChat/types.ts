@@ -1,6 +1,6 @@
 export type MessageRole = "user" | "assistant";
 
-export type SidebarTab = "chat" | "knowledge" | "agents" | "skills";
+export type SidebarTab = "chat" | "knowledge" | "agents" | "skills" | "mcp";
 
 export interface ChatMessage {
   id: string;

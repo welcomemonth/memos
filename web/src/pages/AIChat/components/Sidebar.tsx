@@ -1,4 +1,4 @@
-import { BotIcon, BookOpenIcon, MessageSquareIcon, PlusIcon, SettingsIcon, SparklesIcon, WrenchIcon, XIcon } from "lucide-react";
+import { BotIcon, BookOpenIcon, MessageSquareIcon, PlusIcon, ServerIcon, SettingsIcon, SparklesIcon, WrenchIcon, XIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,9 +65,10 @@ const Sidebar = ({
 
   const tabs: SidebarTabItem[] = [
     { id: "chat", icon: <MessageSquareIcon className="w-4 h-4" />, label: t("ai-chat.tab-chat"), enabled: true },
-    { id: "knowledge", icon: <BookOpenIcon className="w-4 h-4" />, label: t("ai-chat.tab-knowledge"), enabled: false },
+    { id: "knowledge", icon: <BookOpenIcon className="w-4 h-4" />, label: t("ai-chat.tab-knowledge"), enabled: true },
     { id: "agents", icon: <BotIcon className="w-4 h-4" />, label: t("ai-chat.tab-agents"), enabled: false },
     { id: "skills", icon: <WrenchIcon className="w-4 h-4" />, label: t("ai-chat.tab-skills"), enabled: false },
+    { id: "mcp", icon: <ServerIcon className="w-4 h-4" />, label: t("ai-chat.tab-mcp"), enabled: false },
   ];
 
   const grouped = groupByDate(conversations);
@@ -168,14 +169,14 @@ const Sidebar = ({
           </>
         )}
 
-        {activeTab === "knowledge" && (
-          <ComingSoon icon={<BookOpenIcon className="w-7 h-7" />} label={t("ai-chat.tab-knowledge")} />
-        )}
         {activeTab === "agents" && (
           <ComingSoon icon={<SparklesIcon className="w-7 h-7" />} label={t("ai-chat.tab-agents")} />
         )}
         {activeTab === "skills" && (
           <ComingSoon icon={<WrenchIcon className="w-7 h-7" />} label={t("ai-chat.tab-skills")} />
+        )}
+        {activeTab === "mcp" && (
+          <ComingSoon icon={<ServerIcon className="w-7 h-7" />} label={t("ai-chat.tab-mcp")} />
         )}
       </div>
 

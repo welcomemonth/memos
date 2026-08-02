@@ -828,6 +828,7 @@
     "tab-knowledge": "知识库",
     "tab-agents": "Agents",
     "tab-skills": "Skills",
+    "tab-mcp": "MCP",
     "coming-soon": "即将推出",
     "mock-response": "这是一个示例回复。AI 功能正在开发中，敬请期待！",
     "search-conversations": "搜索对话…",
@@ -840,6 +841,19 @@
       "yesterday": "昨天",
       "week": "近 7 天",
       "older": "更早"
-    }
+    },
+    "kb-title": "知识库",
+    "kb-create": "创建知识库",
+    "kb-edit": "编辑知识库",
+    "kb-name": "名称",
+    "kb-description": "描述",
+    "kb-name-placeholder": "输入知识库名称",
+    "kb-description-placeholder": "输入描述（可选）",
+    "kb-no-items": "暂无知识库",
+    "kb-create-first": "创建你的第一个知识库",
+    "kb-documents": "个文档",
+    "kb-delete-confirm": "确定要删除这个知识库吗？",
+    "kb-selected": "已选择",
+    "kb-select": "选择知识库"
   }
 }

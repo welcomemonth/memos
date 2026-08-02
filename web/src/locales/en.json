@@ -938,6 +938,7 @@
     "tab-knowledge": "Knowledge",
     "tab-agents": "Agents",
     "tab-skills": "Skills",
+    "tab-mcp": "MCP",
     "coming-soon": "Coming Soon",
     "mock-response": "This is a sample response. AI features are under development — stay tuned!",
     "search-conversations": "Search conversations…",
@@ -950,6 +951,19 @@
       "yesterday": "Yesterday",
       "week": "Last 7 Days",
       "older": "Older"
-    }
+    },
+    "kb-title": "Knowledge Base",
+    "kb-create": "Create Knowledge Base",
+    "kb-edit": "Edit Knowledge Base",
+    "kb-name": "Name",
+    "kb-description": "Description",
+    "kb-name-placeholder": "Enter knowledge base name",
+    "kb-description-placeholder": "Enter description (optional)",
+    "kb-no-items": "No knowledge bases yet",
+    "kb-create-first": "Create your first knowledge base",
+    "kb-documents": "documents",
+    "kb-delete-confirm": "Are you sure you want to delete this knowledge base?",
+    "kb-selected": "Selected",
+    "kb-select": "Select Knowledge Base"
   }
 }

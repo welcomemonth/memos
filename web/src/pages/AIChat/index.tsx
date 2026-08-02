@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTranslate } from "@/utils/i18n";
 import {
   listConversations,
@@ -9,6 +10,7 @@ import {
   type StreamEvent,
 } from "@/lib/aiChat";
 import { AIMessage_Role } from "@/types/proto/api/v1/ai_conversion_pb";
+import { Routes } from "@/router";
 import ChatView from "./components/ChatView";
 import Sidebar from "./components/Sidebar";
 import type { ChatMessage, Conversation, SidebarTab } from "./types";
@@ -47,12 +49,14 @@ const toLocalMessage = (apiMsg: {
 
 const AIChat = () => {
   const t = useTranslate();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<SidebarTab>("chat");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingReasoning, setStreamingReasoning] = useState("");
+  const [selectedKnowledgeBases, setSelectedKnowledgeBases] = useState<string[]>([]);
 
   // Track the currently streaming conversation to avoid stale closures
   const streamingConvIdRef = useRef<string>("");
@@ -265,7 +269,13 @@ const AIChat = () => {
     <section className="w-full h-svh flex overflow-hidden bg-background">
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => {
+          if (tab === "knowledge") {
+            navigate(Routes.KNOWLEDGE);
+          } else {
+            setActiveTab(tab);
+          }
+        }}
         conversations={conversations}
         activeConvId={activeConvId}
         onSelectConversation={setActiveConvId}
@@ -279,6 +289,8 @@ const AIChat = () => {
           isStreaming={isStreaming}
           streamingContent={streamingContent}
           streamingReasoning={streamingReasoning}
+          selectedKnowledgeBases={selectedKnowledgeBases}
+          onSelectedKnowledgeBasesChange={setSelectedKnowledgeBases}
         />
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
