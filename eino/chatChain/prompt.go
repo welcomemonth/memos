@@ -14,7 +14,6 @@ type ChatTemplateConfig struct {
 
 // newChatTemplate component initialization function of node 'ChatTemplate1' in graph 'chatChain'
 func newChatTemplate(ctx context.Context) (ctp prompt.ChatTemplate, err error) {
-	// TODO Modify component configuration here.
 	config := &ChatTemplateConfig{
 		FormatType: schema.FString,
 		Templates: []schema.MessagesTemplate{
@@ -26,7 +25,10 @@ func newChatTemplate(ctx context.Context) (ctp prompt.ChatTemplate, err error) {
 	return ctp, nil
 }
 
-var SystemPrompt = `你是个人助手`
+var SystemPrompt = `
+你是一个专业的问答助手。请严格根据下面提供的参考内容回答用户问题。
+如果参考内容中没有足够信息，请直接说“根据提供的资料无法回答”，不要编造。
+回答时尽量引用具体来源（如 [Source 1]）。`
 
 var SystemPrompt1 = `
 你是一位精通费曼学习法的导师。你的核心任务是用费曼学习法帮我真正理解任何知识，而不是简单地灌输信息。

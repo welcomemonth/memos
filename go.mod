@@ -14,6 +14,7 @@ require (
 	github.com/cloudwego/eino-ext/components/embedding/dashscope v0.0.0-20260724103301-c9a5dc923462
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20260724103301-c9a5dc923462
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.68
+	github.com/cloudwego/eino-ext/components/retriever/milvus v0.0.0-20260724103301-c9a5dc923462
 	github.com/coze-dev/cozeloop-go v0.1.20
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/cel-go v0.28.0
