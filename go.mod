@@ -15,6 +15,8 @@ require (
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20260724103301-c9a5dc923462
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.68
 	github.com/cloudwego/eino-ext/components/retriever/milvus v0.0.0-20260724103301-c9a5dc923462
+	github.com/cloudwego/eino-ext/components/tool/duckduckgo v0.0.0-20260803030130-90a15623ddb6
+	github.com/cloudwego/eino-ext/components/tool/googlesearch v0.0.0-20260803030130-90a15623ddb6
 	github.com/coze-dev/cozeloop-go v0.1.20
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/cel-go v0.28.0
@@ -33,6 +35,7 @@ require (
 	github.com/openai/openai-go/v3 v3.32.0
 	github.com/pion/opus v0.0.0-20260430223319-81a9c5dc5013
 	github.com/pkg/errors v0.9.2-0.20201214064552-5dd12d0cfe7f
+	github.com/serpapi/serpapi-golang v0.0.0-20260126142127-0e41c7993cda
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
@@ -56,6 +59,7 @@ require (
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.20.0 // indirect
+	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect

@@ -17,6 +17,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/usememos/memos/eino/chatChain"
+	"github.com/usememos/memos/eino/chatReAct"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/store"
 )
@@ -500,7 +501,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 	slog.Debug("Current Conversation History", "count", len(history), "history", history)
 	// ===== 7. 调用 Eino 流式生成 =====
-	runner, err := chatChain.BuildchatChain(ctx)
+	runner, err := chatReAct.BuildchatChain(ctx)
 	if err != nil {
 		// 构建失败 → 更新 message 状态为 error，通知前端
 		errMsg := "failed to build chat chain: " + err.Error()

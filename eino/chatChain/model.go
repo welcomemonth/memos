@@ -9,7 +9,7 @@ import (
 )
 
 // newChatModel component initialization function of node 'ChatModel1' in graph 'chatChain'
-func newChatModel(ctx context.Context) (cm model.ChatModel, err error) {
+func NewChatModel(ctx context.Context) (cm model.ChatModel, err error) {
 	// timeout := time.Second * 10
 	// TODO Modify component configuration here.
 	config := &ark.ChatModelConfig{

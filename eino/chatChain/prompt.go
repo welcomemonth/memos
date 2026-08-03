@@ -13,7 +13,7 @@ type ChatTemplateConfig struct {
 }
 
 // newChatTemplate component initialization function of node 'ChatTemplate1' in graph 'chatChain'
-func newChatTemplate(ctx context.Context) (ctp prompt.ChatTemplate, err error) {
+func NewChatTemplate(ctx context.Context) (ctp prompt.ChatTemplate, err error) {
 	config := &ChatTemplateConfig{
 		FormatType: schema.FString,
 		Templates: []schema.MessagesTemplate{

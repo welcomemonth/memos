@@ -14,13 +14,13 @@ func BuildchatChain(ctx context.Context) (r compose.Runnable[any, any], err erro
 	)
 	g := compose.NewGraph[any, any]()
 	_ = g.AddLambdaNode(PreparePrompt, compose.InvokableLambda(NewPreparePromptLambdaFunc), compose.WithNodeName("PreparePromptToChat"))
-	chatModel1KeyOfChatModel, err := newChatModel(ctx)
+	chatModel1KeyOfChatModel, err := NewChatModel(ctx)
 	if err != nil {
 		return nil, err
 	}
 	_ = g.AddChatModelNode(ChatModel1, chatModel1KeyOfChatModel, compose.WithNodeName("ChatModel"),
 		compose.WithInputKey(""))
-	chatTemplate1KeyOfChatTemplate, err := newChatTemplate(ctx)
+	chatTemplate1KeyOfChatTemplate, err := NewChatTemplate(ctx)
 	if err != nil {
 		return nil, err
 	}
