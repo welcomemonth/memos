@@ -24,6 +24,7 @@ import (
 // flows to the output in parallel.
 func fullStreamToolCallChecker(_ context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
 	defer sr.Close()
+	msgContent := ""
 	hasToolCalls := false
 	for {
 		msg, err := sr.Recv()
@@ -36,8 +37,10 @@ func fullStreamToolCallChecker(_ context.Context, sr *schema.StreamReader[*schem
 		if len(msg.ToolCalls) > 0 {
 			hasToolCalls = true
 		}
+		msgContent += msg.Content
 	}
 	slog.Info("[react] fullStreamToolCallChecker result", "hasToolCalls", hasToolCalls)
+	slog.Info("[react] fullStreamToolCallChecker content: ", "msgContent", msgContent)
 	return hasToolCalls, nil
 }
 

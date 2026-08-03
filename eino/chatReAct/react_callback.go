@@ -2,6 +2,7 @@ package chatReAct
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"sync"
 	"time"
@@ -14,40 +15,51 @@ import (
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 )
 
-// ToolCallRecord tracks a single tool call for persistence and display.
-type ToolCallRecord struct {
-	ID         string
-	Name       string
-	Arguments  string
-	Result     string
-	Status     v1pb.ToolCall_ToolCallStatus
-	DurationMs int32
-	StartTime  time.Time
+// TraceStep represents one step in the ReAct trace, preserving the interleaved
+// order of reasoning, model content, and tool calls across iterations.
+type TraceStep struct {
+	Type string `json:"type"` // "reasoning" | "content" | "tool_call"
+
+	// For "reasoning" and "content" steps:
+	Content string `json:"content,omitempty"`
+
+	// For "tool_call" steps:
+	ToolCallID   string `json:"tool_call_id,omitempty"`
+	ToolName     string `json:"tool_name,omitempty"`
+	Arguments    string `json:"arguments,omitempty"`
+	Result       string `json:"result,omitempty"`
+	Status       string `json:"status,omitempty"` // "running" | "completed" | "failed"
+	DurationMs   int32  `json:"duration_ms,omitempty"`
+
+	// internal: track start time for duration calculation
+	startTime time.Time `json:"-"`
 }
 
-// ReactCallbacks wraps the Eino callback handler and collects tool call records.
+// ReactCallbacks wraps the Eino callback handler and collects:
+// - A react_trace (ordered steps) for persistence
+// - Real-time stream events for the frontend
 type ReactCallbacks struct {
 	Handler   callbacks.Handler
 	SendEvent func(*v1pb.StreamMessageEvent) error
 
-	mu      sync.Mutex
-	records []*ToolCallRecord
+	mu    sync.Mutex
+	trace []TraceStep
 }
 
-// NewReactCallbacks creates a callback handler that emits ToolCall stream events
-// and forwards intermediate LLM reasoning to the client.
+// NewReactCallbacks creates a callback handler that:
+// 1. Emits ToolCall stream events to the frontend in real-time
+// 2. Collects an ordered react_trace for persistence
 //
 // sendEvent MUST be safe for concurrent use (the caller should wrap stream.Send with a mutex).
 func NewReactCallbacks(sendEvent func(*v1pb.StreamMessageEvent) error) *ReactCallbacks {
 	rc := &ReactCallbacks{
 		SendEvent: sendEvent,
-		records:   make([]*ToolCallRecord, 0),
+		trace:     make([]TraceStep, 0),
 	}
 
 	rc.Handler = ucb.NewHandlerHelper().
 		ChatModel(&ucb.ModelCallbackHandler{
-			OnStart: rc.onChatModelStart,
-			// OnEnd 不会对 Stream 调用触发，中间推理转发到 ToolsNode.OnStart 中处理
+			OnStart:               rc.onChatModelStart,
 			OnEndWithStreamOutput: rc.onChatModelStreamEnd,
 		}).
 		ToolsNode(&ucb.ToolsNodeCallbackHandlers{
@@ -60,16 +72,29 @@ func NewReactCallbacks(sendEvent func(*v1pb.StreamMessageEvent) error) *ReactCal
 	return rc
 }
 
-// Records returns a copy of the collected tool call records.
-func (rc *ReactCallbacks) Records() []*ToolCallRecord {
+// Trace returns a copy of the collected react trace.
+func (rc *ReactCallbacks) Trace() []TraceStep {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	out := make([]*ToolCallRecord, len(rc.records))
-	copy(out, rc.records)
+	out := make([]TraceStep, len(rc.trace))
+	copy(out, rc.trace)
 	return out
 }
 
-// onChatModelStart fires before each LLM call. Logs the tools available to the model.
+// TraceJSON returns the trace as a JSON string for storage in payload.
+func (rc *ReactCallbacks) TraceJSON() string {
+	rc.mu.Lock()
+	defer rc.mu.Unlock()
+	b, err := json.Marshal(rc.trace)
+	if err != nil {
+		slog.Warn("failed to marshal react trace", "err", err)
+		return "[]"
+	}
+	return string(b)
+}
+
+// --- ChatModel callbacks ---
+
 func (rc *ReactCallbacks) onChatModelStart(_ context.Context, _ *callbacks.RunInfo, input *model.CallbackInput) context.Context {
 	slog.Info("[react_callback] ChatModel.OnStart",
 		"messagesCount", len(input.Messages),
@@ -81,16 +106,13 @@ func (rc *ReactCallbacks) onChatModelStart(_ context.Context, _ *callbacks.RunIn
 	return context.Background()
 }
 
-// onChatModelStreamEnd fires after each streaming LLM call completes.
-// We consume the stream copy to accumulate chunks and log the final result.
-// Note: For the final step, the stream is also consumed by the normal streamReader.
+// onChatModelStreamEnd consumes the forked stream copy to log the accumulated result.
+// This does NOT affect the main output stream.
 func (rc *ReactCallbacks) onChatModelStreamEnd(_ context.Context, _ *callbacks.RunInfo, output *schema.StreamReader[*model.CallbackOutput]) context.Context {
 	if output == nil {
 		return context.Background()
 	}
-	// Accumulate streaming chunks to get the final message
-	var lastContent string
-	var lastReasoning string
+	var lastContent, lastReasoning string
 	var lastToolCalls []schema.ToolCall
 	var lastFinishReason string
 	for {
@@ -113,7 +135,6 @@ func (rc *ReactCallbacks) onChatModelStreamEnd(_ context.Context, _ *callbacks.R
 	}
 	slog.Info("[react_callback] ChatModel.OnEndWithStreamOutput (accumulated)",
 		"contentLen", len(lastContent),
-		"contentPreview", preview(lastContent, 200),
 		"reasoningLen", len(lastReasoning),
 		"toolCallsCount", len(lastToolCalls),
 		"finishReason", lastFinishReason,
@@ -121,62 +142,11 @@ func (rc *ReactCallbacks) onChatModelStreamEnd(_ context.Context, _ *callbacks.R
 	return context.Background()
 }
 
-// onChatModelEnd fires after each LLM call. For intermediate steps (where the LLM
-// decided to call tools), we forward the reasoning content so the client can display
-// the "thinking → tool call" flow. The final step's content/reasoning is already
-// streamed via the normal streamReader.Recv() loop, so we skip it here.
-func (rc *ReactCallbacks) onChatModelEnd(_ context.Context, _ *callbacks.RunInfo, output *model.CallbackOutput) context.Context {
-	msg := output.Message
-	if msg == nil {
-		slog.Info("[react_callback] ChatModel.OnEnd: msg is nil")
-		return context.Background()
-	}
+// --- ToolsNode callbacks ---
 
-	slog.Info("[react_callback] ChatModel.OnEnd",
-		"contentLen", len(msg.Content),
-		"contentPreview", preview(msg.Content, 200),
-		"reasoningLen", len(msg.ReasoningContent),
-		"toolCallsCount", len(msg.ToolCalls),
-		"finishReason", msg.ResponseMeta.FinishReason,
-	)
-	for i, tc := range msg.ToolCalls {
-		slog.Info("[react_callback]   toolCall",
-			"index", i,
-			"id", tc.ID,
-			"name", tc.Function.Name,
-			"args", preview(tc.Function.Arguments, 200),
-		)
-	}
-
-	// Intermediate step: LLM wants to call tools → forward reasoning
-	if len(msg.ToolCalls) > 0 {
-		if msg.ReasoningContent != "" {
-			if err := rc.SendEvent(&v1pb.StreamMessageEvent{
-				Event: &v1pb.StreamMessageEvent_Reasoning{
-					Reasoning: &v1pb.ReasoningDelta{Delta: msg.ReasoningContent},
-				},
-			}); err != nil {
-				slog.Warn("failed to send intermediate reasoning", "err", err)
-			}
-		}
-		// Some models put reasoning in Content for intermediate steps
-		if msg.Content != "" {
-			if err := rc.SendEvent(&v1pb.StreamMessageEvent{
-				Event: &v1pb.StreamMessageEvent_Content{
-					Content: &v1pb.ContentDelta{Delta: msg.Content},
-				},
-			}); err != nil {
-				slog.Warn("failed to send intermediate content", "err", err)
-			}
-		}
-	}
-
-	return context.Background()
-}
-
-// onToolsNodeStart fires when the tools node begins execution. The input message
-// contains all tool calls the LLM decided to make. We emit ToolCallStart + ToolCallDelta
-// for each, and track them for later ToolCallEnd correlation.
+// onToolsNodeStart fires when the tools node begins execution.
+// The input message contains reasoning, content, and tool calls from the preceding LLM call.
+// We record all of these into the trace AND emit stream events to the frontend.
 func (rc *ReactCallbacks) onToolsNodeStart(_ context.Context, _ *callbacks.RunInfo, input *schema.Message) context.Context {
 	if input == nil {
 		slog.Info("[react_callback] ToolsNode.OnStart: input is nil")
@@ -189,13 +159,18 @@ func (rc *ReactCallbacks) onToolsNodeStart(_ context.Context, _ *callbacks.RunIn
 		"contentLen", len(input.Content),
 	)
 
-	// Forward the model's intermediate reasoning BEFORE the tool call events.
-	// This gives the frontend the "thinking → tool call" order.
-	// Note: we do NOT forward intermediate Content as ContentDelta, because that
-	// would pollute streamingContent (the final answer). If the model puts useful
-	// info in Content for intermediate steps, the frontend can see it in the
-	// ToolCall arguments/results.
+	now := time.Now()
+
+	// 1. Record reasoning step (model's thinking before calling tools)
 	if input.ReasoningContent != "" {
+		rc.mu.Lock()
+		rc.trace = append(rc.trace, TraceStep{
+			Type:    "reasoning",
+			Content: input.ReasoningContent,
+		})
+		rc.mu.Unlock()
+
+		// Also send to frontend in real-time
 		if err := rc.SendEvent(&v1pb.StreamMessageEvent{
 			Event: &v1pb.StreamMessageEvent_Reasoning{
 				Reasoning: &v1pb.ReasoningDelta{Delta: input.ReasoningContent},
@@ -205,9 +180,31 @@ func (rc *ReactCallbacks) onToolsNodeStart(_ context.Context, _ *callbacks.RunIn
 		}
 	}
 
-	now := time.Now()
+	// 2. Record content step (model's transitional text before tool calls)
+	if input.Content != "" {
+		rc.mu.Lock()
+		rc.trace = append(rc.trace, TraceStep{
+			Type:    "content",
+			Content: input.Content,
+		})
+		rc.mu.Unlock()
+	}
+
+	// 3. Record tool_call steps and emit stream events
 	for _, tc := range input.ToolCalls {
-		// Emit ToolCallStart
+		// Add to trace
+		rc.mu.Lock()
+		rc.trace = append(rc.trace, TraceStep{
+			Type:       "tool_call",
+			ToolCallID: tc.ID,
+			ToolName:   tc.Function.Name,
+			Arguments:  tc.Function.Arguments,
+			Status:     "running",
+			startTime:  now,
+		})
+		rc.mu.Unlock()
+
+		// Emit ToolCallStart to frontend
 		if err := rc.SendEvent(&v1pb.StreamMessageEvent{
 			Event: &v1pb.StreamMessageEvent_ToolCallStart{
 				ToolCallStart: &v1pb.ToolCallStart{
@@ -233,33 +230,47 @@ func (rc *ReactCallbacks) onToolsNodeStart(_ context.Context, _ *callbacks.RunIn
 			}
 		}
 
-		// Track record for OnEnd correlation
-		rc.mu.Lock()
-		rc.records = append(rc.records, &ToolCallRecord{
-			ID:        tc.ID,
-			Name:      tc.Function.Name,
-			Arguments: tc.Function.Arguments,
-			Status:    v1pb.ToolCall_TOOL_CALL_RUNNING,
-			StartTime: now,
-		})
-		rc.mu.Unlock()
+		slog.Info("[react_callback]   toolCall",
+			"id", tc.ID, "name", tc.Function.Name,
+			"args", preview(tc.Function.Arguments, 200),
+		)
 	}
 
 	return context.Background()
 }
 
-// onToolsNodeEnd fires when all tools in the node have finished. Each output message
-// corresponds to a tool result, correlated by ToolCallID.
+// onToolsNodeEnd fires when all tools in the node have finished.
+// We update the trace entries with results AND emit ToolCallEnd events.
 func (rc *ReactCallbacks) onToolsNodeEnd(_ context.Context, _ *callbacks.RunInfo, output []*schema.Message) context.Context {
 	slog.Info("[react_callback] ToolsNode.OnEnd", "resultsCount", len(output))
+
 	for _, msg := range output {
 		if msg == nil {
 			continue
 		}
-		slog.Info("[react_callback]   toolResult", "toolCallId", msg.ToolCallID, "contentLen", len(msg.Content), "contentPreview", preview(msg.Content, 200))
 
 		duration := rc.computeDuration(msg.ToolCallID)
 
+		slog.Info("[react_callback]   toolResult",
+			"toolCallId", msg.ToolCallID,
+			"contentLen", len(msg.Content),
+			"contentPreview", preview(msg.Content, 200),
+			"durationMs", duration,
+		)
+
+		// Update trace entry with result
+		rc.mu.Lock()
+		for i := range rc.trace {
+			if rc.trace[i].Type == "tool_call" && rc.trace[i].ToolCallID == msg.ToolCallID {
+				rc.trace[i].Result = msg.Content
+				rc.trace[i].Status = "completed"
+				rc.trace[i].DurationMs = duration
+				break
+			}
+		}
+		rc.mu.Unlock()
+
+		// Emit ToolCallEnd to frontend
 		if err := rc.SendEvent(&v1pb.StreamMessageEvent{
 			Event: &v1pb.StreamMessageEvent_ToolCallEnd{
 				ToolCallEnd: &v1pb.ToolCallEnd{
@@ -272,32 +283,20 @@ func (rc *ReactCallbacks) onToolsNodeEnd(_ context.Context, _ *callbacks.RunInfo
 		}); err != nil {
 			slog.Warn("failed to send ToolCallEnd", "err", err)
 		}
-
-		// Update record
-		rc.mu.Lock()
-		for _, r := range rc.records {
-			if r.ID == msg.ToolCallID {
-				r.Result = msg.Content
-				r.Status = v1pb.ToolCall_TOOL_CALL_COMPLETED
-				r.DurationMs = duration
-				break
-			}
-		}
-		rc.mu.Unlock()
 	}
 
 	return context.Background()
 }
 
 // onToolsNodeError fires when the tools node encounters an error.
-// We mark all still-running tool calls as failed.
 func (rc *ReactCallbacks) onToolsNodeError(_ context.Context, _ *callbacks.RunInfo, err error) context.Context {
+	slog.Warn("[react_callback] ToolsNode.OnError", "err", err)
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	for _, r := range rc.records {
-		if r.Status == v1pb.ToolCall_TOOL_CALL_RUNNING {
-			r.Status = v1pb.ToolCall_TOOL_CALL_FAILED
-			r.Result = err.Error()
+	for i := range rc.trace {
+		if rc.trace[i].Type == "tool_call" && rc.trace[i].Status == "running" {
+			rc.trace[i].Status = "failed"
+			rc.trace[i].Result = err.Error()
 		}
 	}
 	return context.Background()
@@ -307,9 +306,9 @@ func (rc *ReactCallbacks) onToolsNodeError(_ context.Context, _ *callbacks.RunIn
 func (rc *ReactCallbacks) computeDuration(toolCallID string) int32 {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	for _, r := range rc.records {
-		if r.ID == toolCallID && !r.StartTime.IsZero() {
-			return int32(time.Since(r.StartTime).Milliseconds())
+	for _, step := range rc.trace {
+		if step.Type == "tool_call" && step.ToolCallID == toolCallID && !step.startTime.IsZero() {
+			return int32(time.Since(step.startTime).Milliseconds())
 		}
 	}
 	return 0

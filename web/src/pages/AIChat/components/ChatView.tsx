@@ -370,6 +370,13 @@ const ToolCallCard = ({
     // keep original
   }
 
+  // Short result preview
+  const resultPreview = toolCall.result
+    ? toolCall.result.length > 120
+      ? toolCall.result.slice(0, 120) + "…"
+      : toolCall.result
+    : null;
+
   return (
     <div className="flex gap-3">
       <div className="shrink-0 mt-0.5">
@@ -386,6 +393,12 @@ const ToolCallCard = ({
             <span className="text-xs text-muted-foreground">{toolCall.durationMs}ms</span>
           )}
         </div>
+        {/* Show result summary by default when completed */}
+        {resultPreview && toolCall.status !== "running" && (
+          <div className="text-xs text-muted-foreground/80 bg-muted/30 rounded-md px-2.5 py-1.5 mb-1 whitespace-pre-wrap break-all font-mono max-h-20 overflow-y-auto">
+            {resultPreview}
+          </div>
+        )}
         <button
           onClick={onToggle}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors"

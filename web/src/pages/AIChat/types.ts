@@ -24,6 +24,8 @@ export interface ChatMessage {
   timestamp: number;
   model?: string;
   toolCalls?: ToolCallInfo[];
+  /** Preserved interleaved order of reasoning + tool calls from the ReAct trace. */
+  steps?: StreamingStep[];
 }
 
 export interface Conversation {

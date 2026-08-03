@@ -609,7 +609,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 
 	// ===== 8. 流结束 → 更新 DB 中的 assistant message =====
-	// 构建 Payload JSON：reasoning_items + tool_calls
+	// 构建 Payload JSON：保存完整的 react_trace（有序思考链）
 	payload := map[string]any{}
 	if fullReasoning != "" {
 		payload["reasoning_items"] = []map[string]any{
@@ -620,20 +620,10 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 			},
 		}
 	}
-	// 持久化工具调用记录
-	if records := reactCB.Records(); len(records) > 0 {
-		toolCalls := make([]map[string]any, 0, len(records))
-		for _, r := range records {
-			toolCalls = append(toolCalls, map[string]any{
-				"id":          r.ID,
-				"name":        r.Name,
-				"arguments":   r.Arguments,
-				"result":      r.Result,
-				"status":      r.Status.String(),
-				"duration_ms": r.DurationMs,
-			})
-		}
-		payload["tool_calls"] = toolCalls
+	// 保存完整的 ReAct 有序思考链
+	traceJSON := reactCB.TraceJSON()
+	if traceJSON != "" && traceJSON != "[]" {
+		payload["react_trace"] = json.RawMessage(traceJSON)
 	}
 
 	var payloadStr string
@@ -714,10 +704,11 @@ func convertMessageToPb(m *store.AIMessage, convUID string) *v1pb.AIMessage {
 		UpdateTime:    timestamppb.New(time.Unix(m.UpdatedTs, 0)),
 	}
 
-	// 解析 Payload JSON，填充 reasoning_items
+	// 解析 Payload JSON，填充 reasoning_items 和 tool_calls
 	if m.Payload != "" && m.Payload != "{}" {
 		var payload map[string]any
 		if err := json.Unmarshal([]byte(m.Payload), &payload); err == nil {
+			// 旧格式：reasoning_items
 			if items, ok := payload["reasoning_items"].([]any); ok {
 				for _, item := range items {
 					if itemMap, ok := item.(map[string]any); ok {
@@ -735,38 +726,83 @@ func convertMessageToPb(m *store.AIMessage, convUID string) *v1pb.AIMessage {
 					}
 				}
 			}
-			if tcs, ok := payload["tool_calls"].([]any); ok {
-				for _, item := range tcs {
-					if tcMap, ok := item.(map[string]any); ok {
-						tc := &v1pb.ToolCall{}
-						if id, ok := tcMap["id"].(string); ok {
-							tc.Id = id
+			// 新格式：react_trace（有序思考链）→ 提取 tool_call 步骤填充 ToolCalls
+			if rt, ok := payload["react_trace"].([]any); ok {
+				for _, item := range rt {
+					step, ok := item.(map[string]any)
+					if !ok {
+						continue
+					}
+					stepType, _ := step["type"].(string)
+					if stepType != "tool_call" {
+						continue
+					}
+					tc := &v1pb.ToolCall{}
+					if id, ok := step["tool_call_id"].(string); ok {
+						tc.Id = id
+					}
+					if name, ok := step["tool_name"].(string); ok {
+						tc.Name = name
+					}
+					if args, ok := step["arguments"].(string); ok {
+						tc.Arguments = args
+					}
+					if result, ok := step["result"].(string); ok {
+						tc.Result = result
+					}
+					if statusStr, ok := step["status"].(string); ok {
+						switch statusStr {
+						case "completed":
+							tc.Status = v1pb.ToolCall_TOOL_CALL_COMPLETED
+						case "failed":
+							tc.Status = v1pb.ToolCall_TOOL_CALL_FAILED
+						case "running":
+							tc.Status = v1pb.ToolCall_TOOL_CALL_RUNNING
+						default:
+							tc.Status = v1pb.ToolCall_TOOL_CALL_STATUS_UNSPECIFIED
 						}
-						if name, ok := tcMap["name"].(string); ok {
-							tc.Name = name
-						}
-						if args, ok := tcMap["arguments"].(string); ok {
-							tc.Arguments = args
-						}
-						if result, ok := tcMap["result"].(string); ok {
-							tc.Result = result
-						}
-						if statusStr, ok := tcMap["status"].(string); ok {
-							switch statusStr {
-							case "TOOL_CALL_COMPLETED":
-								tc.Status = v1pb.ToolCall_TOOL_CALL_COMPLETED
-							case "TOOL_CALL_FAILED":
-								tc.Status = v1pb.ToolCall_TOOL_CALL_FAILED
-							case "TOOL_CALL_RUNNING":
-								tc.Status = v1pb.ToolCall_TOOL_CALL_RUNNING
-							default:
-								tc.Status = v1pb.ToolCall_TOOL_CALL_STATUS_UNSPECIFIED
+					}
+					if dm, ok := step["duration_ms"].(float64); ok {
+						tc.DurationMs = int32(dm)
+					}
+					msg.ToolCalls = append(msg.ToolCalls, tc)
+				}
+			}
+			// 旧格式：tool_calls（向后兼容）
+			if len(msg.ToolCalls) == 0 {
+				if tcs, ok := payload["tool_calls"].([]any); ok {
+					for _, item := range tcs {
+						if tcMap, ok := item.(map[string]any); ok {
+							tc := &v1pb.ToolCall{}
+							if id, ok := tcMap["id"].(string); ok {
+								tc.Id = id
 							}
+							if name, ok := tcMap["name"].(string); ok {
+								tc.Name = name
+							}
+							if args, ok := tcMap["arguments"].(string); ok {
+								tc.Arguments = args
+							}
+							if result, ok := tcMap["result"].(string); ok {
+								tc.Result = result
+							}
+							if statusStr, ok := tcMap["status"].(string); ok {
+								switch statusStr {
+								case "TOOL_CALL_COMPLETED":
+									tc.Status = v1pb.ToolCall_TOOL_CALL_COMPLETED
+								case "TOOL_CALL_FAILED":
+									tc.Status = v1pb.ToolCall_TOOL_CALL_FAILED
+								case "TOOL_CALL_RUNNING":
+									tc.Status = v1pb.ToolCall_TOOL_CALL_RUNNING
+								default:
+									tc.Status = v1pb.ToolCall_TOOL_CALL_STATUS_UNSPECIFIED
+								}
+							}
+							if dm, ok := tcMap["duration_ms"].(float64); ok {
+								tc.DurationMs = int32(dm)
+							}
+							msg.ToolCalls = append(msg.ToolCalls, tc)
 						}
-						if dm, ok := tcMap["duration_ms"].(float64); ok {
-							tc.DurationMs = int32(dm)
-						}
-						msg.ToolCalls = append(msg.ToolCalls, tc)
 					}
 				}
 			}

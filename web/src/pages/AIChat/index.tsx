@@ -58,6 +58,22 @@ const toLocalMessage = (apiMsg: {
       }))
     : undefined;
 
+  // Reconstruct steps from API data for interleaved display.
+  // API doesn't preserve exact interleaving, so we group: reasoning → tool calls.
+  const steps: StreamingStep[] | undefined = (() => {
+    const result: StreamingStep[] = [];
+    const reasoningText = apiMsg.reasoningItems?.map((r) => r.content).filter(Boolean).join("\n\n");
+    if (reasoningText) {
+      result.push({ type: "reasoning", content: reasoningText });
+    }
+    if (toolCalls) {
+      for (const tc of toolCalls) {
+        result.push({ type: "tool_call", toolCall: tc });
+      }
+    }
+    return result.length > 0 ? result : undefined;
+  })();
+
   return {
     id: apiMsg.name,
     role: apiMsg.role === AIMessage_Role.USER ? "user" : "assistant",
@@ -65,6 +81,7 @@ const toLocalMessage = (apiMsg: {
     model: apiMsg.model,
     reasoning: apiMsg.reasoningItems?.map((r) => r.content).filter(Boolean).join("\n\n") || undefined,
     toolCalls,
+    steps,
     timestamp: apiMsg.createTime ? Number(apiMsg.createTime.seconds) * 1000 : Date.now(),
   };
 };
@@ -288,6 +305,7 @@ const AIChat = () => {
               reasoning: streamingReasoningRef.current || undefined,
               model: event.done.model,
               toolCalls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
+              steps: streamingStepsRef.current.length > 0 ? [...streamingStepsRef.current] : undefined,
               timestamp: Date.now(),
             };
 
