@@ -2898,6 +2898,12 @@ components:
                     readOnly: true
                     type: string
                     format: date-time
+                reactTrace:
+                    type: string
+                    description: |-
+                        Complete ReAct trace as JSON array. Preserves the interleaved order of
+                         reasoning, content, and tool_call steps across all iterations.
+                         Each element has a "type" field: "reasoning" | "content" | "tool_call".
         Attachment:
             required:
                 - filename

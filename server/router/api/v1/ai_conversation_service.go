@@ -807,6 +807,13 @@ func convertMessageToPb(m *store.AIMessage, convUID string) *v1pb.AIMessage {
 				}
 			}
 		}
+
+		// 透传 react_trace JSON 到前端
+		if rt, ok := payload["react_trace"]; ok {
+			if b, err := json.Marshal(rt); err == nil {
+				msg.ReactTrace = string(b)
+			}
+		}
 	}
 
 	return msg

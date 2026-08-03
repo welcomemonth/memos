@@ -598,9 +598,13 @@ type AIMessage struct {
 	// Token usage.
 	TokensUsed int32 `protobuf:"varint,12,opt,name=tokens_used,json=tokensUsed,proto3" json:"tokens_used,omitempty"`
 	// Error detail when status is ERROR.
-	ErrorMessage  string                 `protobuf:"bytes,13,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
-	CreateTime    *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
-	UpdateTime    *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	ErrorMessage string                 `protobuf:"bytes,13,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	CreateTime   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
+	UpdateTime   *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=update_time,json=updateTime,proto3" json:"update_time,omitempty"`
+	// Complete ReAct trace as JSON array. Preserves the interleaved order of
+	// reasoning, content, and tool_call steps across all iterations.
+	// Each element has a "type" field: "reasoning" | "content" | "tool_call".
+	ReactTrace    string `protobuf:"bytes,16,opt,name=react_trace,json=reactTrace,proto3" json:"react_trace,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -738,6 +742,13 @@ func (x *AIMessage) GetUpdateTime() *timestamppb.Timestamp {
 		return x.UpdateTime
 	}
 	return nil
+}
+
+func (x *AIMessage) GetReactTrace() string {
+	if x != nil {
+		return x.ReactTrace
+	}
+	return ""
 }
 
 type ReasoningItem struct {
@@ -2175,7 +2186,7 @@ const file_api_v1_ai_conversion_service_proto_rawDesc = "" +
 	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
 	"updateMask\"/\n" +
 	"\x19DeleteConversationRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"\xef\x06\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x90\a\n" +
 	"\tAIMessage\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\x06parent\x18\x02 \x01(\tB\x03\xe0A\x03R\x06parent\x120\n" +
@@ -2196,7 +2207,9 @@ const file_api_v1_ai_conversion_service_proto_rawDesc = "" +
 	"\vcreate_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
 	"createTime\x12@\n" +
 	"\vupdate_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\n" +
-	"updateTime\"K\n" +
+	"updateTime\x12\x1f\n" +
+	"\vreact_trace\x18\x10 \x01(\tR\n" +
+	"reactTrace\"K\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\b\n" +
 	"\x04USER\x10\x01\x12\r\n" +

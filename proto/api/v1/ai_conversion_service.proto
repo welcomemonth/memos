@@ -164,6 +164,11 @@ message AIMessage {
   google.protobuf.Timestamp create_time = 14 [(google.api.field_behavior) = OUTPUT_ONLY];
   google.protobuf.Timestamp update_time = 15 [(google.api.field_behavior) = OUTPUT_ONLY];
 
+  // Complete ReAct trace as JSON array. Preserves the interleaved order of
+  // reasoning, content, and tool_call steps across all iterations.
+  // Each element has a "type" field: "reasoning" | "content" | "tool_call".
+  string react_trace = 16;
+
   enum Role {
     ROLE_UNSPECIFIED = 0;
     USER = 1;

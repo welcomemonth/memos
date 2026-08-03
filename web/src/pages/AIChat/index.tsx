@@ -45,6 +45,7 @@ const toLocalMessage = (apiMsg: {
     status: number;
     durationMs: number;
   }>;
+  reactTrace?: string;
   createTime?: { seconds: bigint };
 }): ChatMessage => {
   const toolCalls: ToolCallInfo[] | undefined = apiMsg.toolCalls?.length
@@ -58,9 +59,49 @@ const toLocalMessage = (apiMsg: {
       }))
     : undefined;
 
-  // Reconstruct steps from API data for interleaved display.
-  // API doesn't preserve exact interleaving, so we group: reasoning → tool calls.
+  // Reconstruct steps: prefer react_trace (preserves interleaved order),
+  // fall back to reasoning → tool_calls for old messages.
   const steps: StreamingStep[] | undefined = (() => {
+    // Try parsing react_trace first
+    if (apiMsg.reactTrace) {
+      try {
+        const trace = JSON.parse(apiMsg.reactTrace) as Array<{
+          type: string;
+          content?: string;
+          tool_call_id?: string;
+          tool_name?: string;
+          arguments?: string;
+          result?: string;
+          status?: string;
+          duration_ms?: number;
+        }>;
+        if (trace.length > 0) {
+          const mapped: StreamingStep[] = [];
+          for (const step of trace) {
+            if (step.type === "reasoning" || step.type === "content") {
+              mapped.push({ type: "reasoning", content: step.content || "" });
+            } else if (step.type === "tool_call") {
+              mapped.push({
+                type: "tool_call",
+                toolCall: {
+                  id: step.tool_call_id || "",
+                  name: step.tool_name || "",
+                  arguments: step.arguments || "",
+                  result: step.result || "",
+                  status: (step.status as ToolCallInfo["status"]) || "completed",
+                  durationMs: step.duration_ms,
+                },
+              });
+            }
+          }
+          return mapped.length > 0 ? mapped : undefined;
+        }
+      } catch {
+        // fall through to legacy reconstruction
+      }
+    }
+
+    // Legacy: reasoning → tool calls (loses interleaving)
     const result: StreamingStep[] = [];
     const reasoningText = apiMsg.reasoningItems?.map((r) => r.content).filter(Boolean).join("\n\n");
     if (reasoningText) {
