@@ -13,7 +13,7 @@ import { AIMessage_Role } from "@/types/proto/api/v1/ai_conversion_service_pb";
 import { Routes } from "@/router";
 import ChatView from "./components/ChatView";
 import Sidebar from "./components/Sidebar";
-import type { ChatMessage, Conversation, SidebarTab } from "./types";
+import type { ChatMessage, Conversation, SidebarTab, StreamingStep, ToolCallInfo } from "./types";
 
 /** Convert API conversation to local Conversation type */
 const toLocalConversation = (apiConv: {
@@ -37,15 +37,37 @@ const toLocalMessage = (apiMsg: {
   content: string;
   model?: string;
   reasoningItems?: Array<{ content: string }>;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: string;
+    result: string;
+    status: number;
+    durationMs: number;
+  }>;
   createTime?: { seconds: bigint };
-}): ChatMessage => ({
-  id: apiMsg.name,
-  role: apiMsg.role === AIMessage_Role.USER ? "user" : "assistant",
-  content: apiMsg.content,
-  model: apiMsg.model,
-  reasoning: apiMsg.reasoningItems?.map((r) => r.content).filter(Boolean).join("\n\n") || undefined,
-  timestamp: apiMsg.createTime ? Number(apiMsg.createTime.seconds) * 1000 : Date.now(),
-});
+}): ChatMessage => {
+  const toolCalls: ToolCallInfo[] | undefined = apiMsg.toolCalls?.length
+    ? apiMsg.toolCalls.map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        arguments: tc.arguments,
+        result: tc.result,
+        status: tc.status === 4 ? "failed" : "completed",
+        durationMs: tc.durationMs,
+      }))
+    : undefined;
+
+  return {
+    id: apiMsg.name,
+    role: apiMsg.role === AIMessage_Role.USER ? "user" : "assistant",
+    content: apiMsg.content,
+    model: apiMsg.model,
+    reasoning: apiMsg.reasoningItems?.map((r) => r.content).filter(Boolean).join("\n\n") || undefined,
+    toolCalls,
+    timestamp: apiMsg.createTime ? Number(apiMsg.createTime.seconds) * 1000 : Date.now(),
+  };
+};
 
 const AIChat = () => {
   const t = useTranslate();
@@ -56,6 +78,7 @@ const AIChat = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [streamingReasoning, setStreamingReasoning] = useState("");
+  const [streamingSteps, setStreamingSteps] = useState<StreamingStep[]>([]);
   const [selectedKnowledgeBases, setSelectedKnowledgeBases] = useState<string[]>([]);
 
   // Track the currently streaming conversation to avoid stale closures
@@ -159,6 +182,7 @@ const AIChat = () => {
       setIsStreaming(true);
       setStreamingContent("");
       setStreamingReasoning("");
+      setStreamingSteps([]);
       streamingConvIdRef.current = convName;
 
       console.log("[send] selectedKnowledgeBases=", selectedKnowledgeBases);
@@ -194,17 +218,76 @@ const AIChat = () => {
             setStreamingContent((prev) => prev + event.content!.delta);
           }
           if (event.reasoning?.delta) {
-            setStreamingReasoning((prev) => prev + event.reasoning!.delta);
+            const delta = event.reasoning.delta;
+            setStreamingReasoning((prev) => prev + delta);
+            // Also append to streaming steps for interleaved display
+            setStreamingSteps((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.type === "reasoning") {
+                return [...prev.slice(0, -1), { type: "reasoning", content: last.content + delta }];
+              }
+              return [...prev, { type: "reasoning", content: delta }];
+            });
+          }
+          if (event.toolCallStart) {
+            const { toolCallId, name } = event.toolCallStart;
+            setStreamingSteps((prev) => [
+              ...prev,
+              {
+                type: "tool_call",
+                toolCall: { id: toolCallId, name, arguments: "", status: "running" },
+              },
+            ]);
+          }
+          if (event.toolCallDelta) {
+            const { toolCallId, argumentsDelta } = event.toolCallDelta;
+            setStreamingSteps((prev) =>
+              prev.map((step) => {
+                if (step.type === "tool_call" && step.toolCall.id === toolCallId) {
+                  return {
+                    ...step,
+                    toolCall: { ...step.toolCall, arguments: step.toolCall.arguments + argumentsDelta },
+                  };
+                }
+                return step;
+              }),
+            );
+          }
+          if (event.toolCallEnd) {
+            const { toolCallId, result, status, durationMs } = event.toolCallEnd;
+            setStreamingSteps((prev) =>
+              prev.map((step) => {
+                if (step.type === "tool_call" && step.toolCall.id === toolCallId) {
+                  return {
+                    ...step,
+                    toolCall: {
+                      ...step.toolCall,
+                      result,
+                      status: status as ToolCallInfo["status"],
+                      durationMs,
+                    },
+                  };
+                }
+                return step;
+              }),
+            );
           }
           if (event.done) {
             // Append assistant message directly to local state (no API reload)
             const currentConvId = streamingConvIdRef.current;
+
+            // Extract tool calls from streaming steps
+            const finalToolCalls: ToolCallInfo[] = streamingStepsRef.current
+              .filter((s): s is Extract<StreamingStep, { type: "tool_call" }> => s.type === "tool_call")
+              .map((s) => s.toolCall);
+
             const assistantMsg: ChatMessage = {
               id: event.done.messageName || `assistant-${Date.now()}`,
               role: "assistant",
               content: streamingContentRef.current,
               reasoning: streamingReasoningRef.current || undefined,
               model: event.done.model,
+              toolCalls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
               timestamp: Date.now(),
             };
 
@@ -218,6 +301,7 @@ const AIChat = () => {
 
             setStreamingContent("");
             setStreamingReasoning("");
+            setStreamingSteps([]);
             setIsStreaming(false);
           }
           if (event.error) {
@@ -242,12 +326,16 @@ const AIChat = () => {
   // Refs to track latest streaming state for the done handler (avoid stale closures)
   const streamingContentRef = useRef("");
   const streamingReasoningRef = useRef("");
+  const streamingStepsRef = useRef<StreamingStep[]>([]);
   useEffect(() => {
     streamingContentRef.current = streamingContent;
   }, [streamingContent]);
   useEffect(() => {
     streamingReasoningRef.current = streamingReasoning;
   }, [streamingReasoning]);
+  useEffect(() => {
+    streamingStepsRef.current = streamingSteps;
+  }, [streamingSteps]);
 
   const handleNewConversation = useCallback(() => {
     setActiveConvId("");
@@ -292,7 +380,7 @@ const AIChat = () => {
           onSend={handleSend}
           isStreaming={isStreaming}
           streamingContent={streamingContent}
-          streamingReasoning={streamingReasoning}
+          streamingSteps={streamingSteps}
           selectedKnowledgeBases={selectedKnowledgeBases}
           onSelectedKnowledgeBasesChange={setSelectedKnowledgeBases}
         />

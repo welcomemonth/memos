@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BotIcon, BookOpenIcon, ChevronDownIcon, CodeIcon, LightbulbIcon, SendIcon, SparklesIcon, XIcon } from "lucide-react";
+import { BotIcon, BookOpenIcon, ChevronDownIcon, CodeIcon, LightbulbIcon, SendIcon, SparklesIcon, WrenchIcon, XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,14 +10,14 @@ import { listKnowledgeBases, type KnowledgeBase } from "@/lib/knowledge";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { useTranslate } from "@/utils/i18n";
 import MessageBubble from "./MessageBubble";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, StreamingStep, ToolCallInfo } from "../types";
 
 interface Props {
   messages: ChatMessage[];
   onSend: (content: string) => void;
   isStreaming: boolean;
   streamingContent: string;
-  streamingReasoning: string;
+  streamingSteps: StreamingStep[];
   selectedKnowledgeBases: string[];
   onSelectedKnowledgeBasesChange: (names: string[]) => void;
 }
@@ -33,18 +33,28 @@ const ChatView = ({
   onSend,
   isStreaming,
   streamingContent,
-  streamingReasoning,
+  streamingSteps,
   selectedKnowledgeBases,
   onSelectedKnowledgeBasesChange,
 }: Props) => {
   const t = useTranslate();
   const currentUser = useCurrentUser();
   const [input, setInput] = useState("");
-  const [streamingReasoningExpanded, setStreamingReasoningExpanded] = useState(false);
+  const [expandedReasoningIdx, setExpandedReasoningIdx] = useState<number | null>(null);
+  const [expandedToolCallIds, setExpandedToolCallIds] = useState<Set<string>>(new Set());
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-expand the latest reasoning step
+  useEffect(() => {
+    if (!isStreaming || streamingSteps.length === 0) return;
+    const lastReasoningIdx = streamingSteps.map((s, i) => (s.type === "reasoning" ? i : -1)).filter((i) => i >= 0).pop();
+    if (lastReasoningIdx !== undefined) {
+      setExpandedReasoningIdx(lastReasoningIdx);
+    }
+  }, [isStreaming, streamingSteps]);
 
   // Load knowledge bases for selection
   useEffect(() => {
@@ -199,34 +209,57 @@ const ChatView = ({
               <MessageBubble key={msg.id} message={msg} avatarUrl={currentUser?.avatarUrl} />
             ))}
 
-            {/* ── Streaming: Reasoning (collapsible, default collapsed) ── */}
-            {isStreaming && streamingReasoning && (
-              <div className="flex gap-3">
-                <div className="shrink-0 mt-0.5">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <BotIcon className="w-4 h-4 text-primary" />
-                  </div>
-                </div>
-                <div className="max-w-[75%]">
-                  <button
-                    onClick={() => setStreamingReasoningExpanded((prev) => !prev)}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
-                  >
-                    <span className="inline-block animate-spin">⟳</span>
-                    <span>思考中…</span>
-                    <span className="text-muted-foreground/50">{streamingReasoningExpanded ? "▼" : "▶"}</span>
-                  </button>
-                  {streamingReasoningExpanded && (
-                    <div className="text-xs text-muted-foreground/70 whitespace-pre-wrap break-words pl-4 border-l-2 border-border">
-                      {streamingReasoning}
+            {/* ── Streaming: ReAct Steps ──────────────────────── */}
+            {isStreaming && streamingSteps.length > 0 && streamingSteps.map((step, idx) => {
+              if (step.type === "reasoning") {
+                const isLatest = idx === streamingSteps.map((s, i) => (s.type === "reasoning" ? i : -1)).filter((i) => i >= 0).pop();
+                const isExpanded = expandedReasoningIdx === idx;
+                return (
+                  <div key={`reasoning-${idx}`} className="flex gap-3">
+                    <div className="shrink-0 mt-0.5">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                        <BotIcon className="w-4 h-4 text-primary" />
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                    <div className="max-w-[75%]">
+                      <button
+                        onClick={() => setExpandedReasoningIdx(isExpanded ? null : idx)}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
+                      >
+                        {isLatest ? (
+                          <span className="inline-block animate-spin">⟳</span>
+                        ) : (
+                          <BotIcon className="w-3.5 h-3.5" />
+                        )}
+                        <span>{isLatest ? "思考中…" : "思考过程"}</span>
+                        <span className="text-muted-foreground/50">{isExpanded ? "▼" : "▶"}</span>
+                      </button>
+                      {isExpanded && (
+                        <div className="text-xs text-muted-foreground/70 whitespace-pre-wrap break-words pl-4 border-l-2 border-border">
+                          {step.content}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
 
-            {/* ── Streaming: Thinking indicator (no reasoning yet) ──── */}
-            {isStreaming && !streamingReasoning && !streamingContent && (
+              if (step.type === "tool_call") {
+                return <ToolCallCard key={`tc-${step.toolCall.id}`} toolCall={step.toolCall} expanded={expandedToolCallIds.has(step.toolCall.id)} onToggle={() => {
+                  setExpandedToolCallIds((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(step.toolCall.id)) next.delete(step.toolCall.id);
+                    else next.add(step.toolCall.id);
+                    return next;
+                  });
+                }} />;
+              }
+
+              return null;
+            })}
+
+            {/* ── Streaming: Thinking indicator (no steps yet) ── */}
+            {isStreaming && streamingSteps.length === 0 && !streamingContent && (
               <div className="flex gap-3">
                 <div className="shrink-0 mt-0.5">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -243,7 +276,7 @@ const ChatView = ({
               </div>
             )}
 
-            {/* ── Streaming: Content ───────────────────────────────── */}
+            {/* ── Streaming: Content ───────────────────────────── */}
             {isStreaming && streamingContent && (
               <MessageBubble
                 message={{
@@ -305,6 +338,80 @@ const ChatView = ({
             </Button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Tool call card: shows tool name, status, and expandable arguments/result.
+ */
+const ToolCallCard = ({
+  toolCall,
+  expanded,
+  onToggle,
+}: {
+  toolCall: ToolCallInfo;
+  expanded: boolean;
+  onToggle: () => void;
+}) => {
+  const statusConfig = {
+    running: { icon: <span className="inline-block animate-spin text-blue-500">⟳</span>, label: "执行中", color: "text-blue-500" },
+    completed: { icon: <span className="text-green-500">✓</span>, label: "完成", color: "text-green-500" },
+    failed: { icon: <span className="text-red-500">✗</span>, label: "失败", color: "text-red-500" },
+  };
+  const cfg = statusConfig[toolCall.status];
+
+  // Try to pretty-print JSON arguments
+  let formattedArgs = toolCall.arguments;
+  try {
+    formattedArgs = JSON.stringify(JSON.parse(toolCall.arguments), null, 2);
+  } catch {
+    // keep original
+  }
+
+  return (
+    <div className="flex gap-3">
+      <div className="shrink-0 mt-0.5">
+        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+          <WrenchIcon className="w-4 h-4 text-blue-500" />
+        </div>
+      </div>
+      <div className="max-w-[75%] flex-1 min-w-0">
+        <div className="flex items-center gap-2 text-sm mb-0.5">
+          <span className="font-medium text-foreground">{toolCall.name}</span>
+          {cfg.icon}
+          <span className={cn("text-xs", cfg.color)}>{cfg.label}</span>
+          {toolCall.durationMs != null && toolCall.durationMs > 0 && (
+            <span className="text-xs text-muted-foreground">{toolCall.durationMs}ms</span>
+          )}
+        </div>
+        <button
+          onClick={onToggle}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? "收起详情 ▼" : "查看详情 ▶"}
+        </button>
+        {expanded && (
+          <div className="mt-1.5 space-y-1.5">
+            {toolCall.arguments && (
+              <div>
+                <div className="text-[11px] text-muted-foreground font-medium mb-0.5">参数</div>
+                <pre className="bg-muted/50 rounded-md px-2.5 py-1.5 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all border border-border/50">
+                  {formattedArgs}
+                </pre>
+              </div>
+            )}
+            {toolCall.result && (
+              <div>
+                <div className="text-[11px] text-muted-foreground font-medium mb-0.5">结果</div>
+                <pre className="bg-muted/50 rounded-md px-2.5 py-1.5 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all border border-border/50 max-h-48 overflow-y-auto">
+                  {toolCall.result}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

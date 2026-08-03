@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -14,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
 	"github.com/usememos/memos/eino/chatChain"
@@ -513,11 +515,24 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		return status.Errorf(codes.Internal, "failed to build chat chain: %v", err)
 	}
 
+	// 并发安全的 stream.Send：callback 在图执行 goroutine 中触发，
+	// streamReader.Recv() 在主 goroutine 中，两者都会调用 Send。
+	var sendMu sync.Mutex
+	safeSend := func(event *v1pb.StreamMessageEvent) error {
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		return stream.Send(event)
+	}
+
+	// 创建 ReAct 回调：拦截工具调用和中间推理，通过 safeSend 推送给前端
+	reactCB := chatReAct.NewReactCallbacks(safeSend)
+	slog.Debug("[stream] ReAct callbacks created, calling runner.Stream with WithCallbacks")
+
 	streamReader, err := runner.Stream(ctx, map[string]any{
 		"question":    request.Content,
 		"history":     history,
 		"partitionId": request.PartitionId,
-	})
+	}, compose.WithCallbacks(reactCB.Handler))
 	if err != nil {
 		errMsg := "failed to start stream: " + err.Error()
 		_ = s.Store.UpdateAIMessage(ctx, &store.UpdateAIMessage{
@@ -529,7 +544,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 	defer streamReader.Close()
 
-	// ===== 7. 逐 chunk 推送给前端 =====
+	// ===== 7b. 逐 chunk 推送给前端 =====
 	var fullContent string
 	var fullReasoning string
 	for {
@@ -542,7 +557,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 		// 接收出错 → 通知前端，但保留已生成的内容
 		if recvErr != nil {
 			slog.Error("stream recv error", "err", recvErr)
-			_ = stream.Send(&v1pb.StreamMessageEvent{
+			_ = safeSend(&v1pb.StreamMessageEvent{
 				Event: &v1pb.StreamMessageEvent_Error{
 					Error: &v1pb.StreamError{
 						Message: recvErr.Error(),
@@ -560,10 +575,17 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 			continue
 		}
 
+		slog.Debug("[stream] recv chunk",
+			"contentLen", len(msg.Content),
+			"reasoningLen", len(msg.ReasoningContent),
+			"toolCallsCount", len(msg.ToolCalls),
+			"finishReason", msg.ResponseMeta.FinishReason,
+		)
+
 		// 推送 reasoning（思考过程）
 		if msg.ReasoningContent != "" {
 			fullReasoning += msg.ReasoningContent
-			if sendErr := stream.Send(&v1pb.StreamMessageEvent{
+			if sendErr := safeSend(&v1pb.StreamMessageEvent{
 				Event: &v1pb.StreamMessageEvent_Reasoning{
 					Reasoning: &v1pb.ReasoningDelta{Delta: msg.ReasoningContent},
 				},
@@ -575,7 +597,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 
 		// 推送 content（正文）
 		if msg.Content != "" {
-			if sendErr := stream.Send(&v1pb.StreamMessageEvent{
+			if sendErr := safeSend(&v1pb.StreamMessageEvent{
 				Event: &v1pb.StreamMessageEvent_Content{
 					Content: &v1pb.ContentDelta{Delta: msg.Content},
 				},
@@ -587,19 +609,35 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 
 	// ===== 8. 流结束 → 更新 DB 中的 assistant message =====
-	// 如果有 reasoning，构建 Payload JSON
-	var payloadStr string
+	// 构建 Payload JSON：reasoning_items + tool_calls
+	payload := map[string]any{}
 	if fullReasoning != "" {
-		// 构建 reasoning_items JSON
-		payload := map[string]any{
-			"reasoning_items": []map[string]any{
-				{
-					"content":     fullReasoning,
-					"duration_ms": 0,
-					"tokens":      0,
-				},
+		payload["reasoning_items"] = []map[string]any{
+			{
+				"content":     fullReasoning,
+				"duration_ms": 0,
+				"tokens":      0,
 			},
 		}
+	}
+	// 持久化工具调用记录
+	if records := reactCB.Records(); len(records) > 0 {
+		toolCalls := make([]map[string]any, 0, len(records))
+		for _, r := range records {
+			toolCalls = append(toolCalls, map[string]any{
+				"id":          r.ID,
+				"name":        r.Name,
+				"arguments":   r.Arguments,
+				"result":      r.Result,
+				"status":      r.Status.String(),
+				"duration_ms": r.DurationMs,
+			})
+		}
+		payload["tool_calls"] = toolCalls
+	}
+
+	var payloadStr string
+	if len(payload) > 0 {
 		if b, err := json.Marshal(payload); err == nil {
 			payloadStr = string(b)
 		}
@@ -618,7 +656,7 @@ func (s *APIV1Service) StreamMessage(request *v1pb.StreamMessageRequest, stream 
 	}
 
 	// ===== 9. 发送完成事件 =====
-	if err := stream.Send(&v1pb.StreamMessageEvent{
+	if err := safeSend(&v1pb.StreamMessageEvent{
 		Event: &v1pb.StreamMessageEvent_Done{
 			Done: &v1pb.StreamDone{
 				MessageName: "ai/messages/" + assistantMsg.UID,
@@ -694,6 +732,41 @@ func convertMessageToPb(m *store.AIMessage, convUID string) *v1pb.AIMessage {
 							ri.Tokens = int32(tokens)
 						}
 						msg.ReasoningItems = append(msg.ReasoningItems, ri)
+					}
+				}
+			}
+			if tcs, ok := payload["tool_calls"].([]any); ok {
+				for _, item := range tcs {
+					if tcMap, ok := item.(map[string]any); ok {
+						tc := &v1pb.ToolCall{}
+						if id, ok := tcMap["id"].(string); ok {
+							tc.Id = id
+						}
+						if name, ok := tcMap["name"].(string); ok {
+							tc.Name = name
+						}
+						if args, ok := tcMap["arguments"].(string); ok {
+							tc.Arguments = args
+						}
+						if result, ok := tcMap["result"].(string); ok {
+							tc.Result = result
+						}
+						if statusStr, ok := tcMap["status"].(string); ok {
+							switch statusStr {
+							case "TOOL_CALL_COMPLETED":
+								tc.Status = v1pb.ToolCall_TOOL_CALL_COMPLETED
+							case "TOOL_CALL_FAILED":
+								tc.Status = v1pb.ToolCall_TOOL_CALL_FAILED
+							case "TOOL_CALL_RUNNING":
+								tc.Status = v1pb.ToolCall_TOOL_CALL_RUNNING
+							default:
+								tc.Status = v1pb.ToolCall_TOOL_CALL_STATUS_UNSPECIFIED
+							}
+						}
+						if dm, ok := tcMap["duration_ms"].(float64); ok {
+							tc.DurationMs = int32(dm)
+						}
+						msg.ToolCalls = append(msg.ToolCalls, tc)
 					}
 				}
 			}

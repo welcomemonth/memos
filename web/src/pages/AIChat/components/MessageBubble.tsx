@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { BotIcon, BookOpenIcon, ChevronDownIcon, CodeIcon } from "lucide-react";
+import { BotIcon, BookOpenIcon, ChevronDownIcon, CodeIcon, WrenchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "@/components/UserAvatar";
 import { useTranslate } from "@/utils/i18n";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, ToolCallInfo } from "../types";
 
 interface Props {
   message: ChatMessage;
@@ -105,6 +105,67 @@ const ReasoningSection = ({ reasoning }: { reasoning: string }) => {
   );
 };
 
+/**
+ * Collapsible tool calls section for assistant messages.
+ */
+const ToolCallsSection = ({ toolCalls }: { toolCalls: ToolCallInfo[] }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const statusIcon = (status: ToolCallInfo["status"]) => {
+    switch (status) {
+      case "completed":
+        return <span className="text-green-500">✓</span>;
+      case "failed":
+        return <span className="text-red-500">✗</span>;
+      default:
+        return <span className="text-blue-500">⟳</span>;
+    }
+  };
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setExpanded((prev) => !prev)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <WrenchIcon className="w-3.5 h-3.5" />
+        <span>
+          工具调用 ({toolCalls.length})
+          {toolCalls.every((tc) => tc.status === "completed") ? "" : " …"}
+        </span>
+        <ChevronDownIcon
+          className={cn("w-3.5 h-3.5 transition-transform duration-200", expanded && "rotate-180")}
+        />
+      </button>
+      {expanded && (
+        <div className="mt-1.5 space-y-2 pl-4 border-l-2 border-border">
+          {toolCalls.map((tc) => (
+            <div key={tc.id} className="text-xs">
+              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                {statusIcon(tc.status)}
+                <span>{tc.name}</span>
+                {tc.durationMs != null && tc.durationMs > 0 && (
+                  <span className="text-muted-foreground font-normal">{tc.durationMs}ms</span>
+                )}
+              </div>
+              {tc.arguments && (
+                <pre className="mt-0.5 bg-muted/50 rounded px-2 py-1 font-mono text-[11px] overflow-x-auto whitespace-pre-wrap break-all">
+                  {tc.arguments}
+                </pre>
+              )}
+              {tc.result && (
+                <pre className="mt-0.5 bg-muted/30 rounded px-2 py-1 font-mono text-[11px] overflow-x-auto whitespace-pre-wrap break-all max-h-32 overflow-y-auto">
+                  {tc.result}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const MessageBubble = ({ message, avatarUrl }: Props) => {
   const isUser = message.role === "user";
   const segments = parseContent(message.content);
@@ -126,6 +187,11 @@ const MessageBubble = ({ message, avatarUrl }: Props) => {
       <div className={cn("max-w-[75%] min-w-0", isUser ? "" : "")}>
         {/* Reasoning (only for assistant messages with reasoning) */}
         {!isUser && message.reasoning && <ReasoningSection reasoning={message.reasoning} />}
+
+        {/* Tool calls (only for assistant messages with tool calls) */}
+        {!isUser && message.toolCalls && message.toolCalls.length > 0 && (
+          <ToolCallsSection toolCalls={message.toolCalls} />
+        )}
 
         <div
           className={cn(

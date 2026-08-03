@@ -2,6 +2,20 @@ export type MessageRole = "user" | "assistant";
 
 export type SidebarTab = "chat" | "knowledge" | "agents" | "skills" | "mcp";
 
+export interface ToolCallInfo {
+  id: string;
+  name: string;
+  arguments: string;
+  result?: string;
+  status: "running" | "completed" | "failed";
+  durationMs?: number;
+}
+
+/** A single step in the ReAct trace: either reasoning text or a tool call. */
+export type StreamingStep =
+  | { type: "reasoning"; content: string }
+  | { type: "tool_call"; toolCall: ToolCallInfo };
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
@@ -9,6 +23,7 @@ export interface ChatMessage {
   reasoning?: string;
   timestamp: number;
   model?: string;
+  toolCalls?: ToolCallInfo[];
 }
 
 export interface Conversation {

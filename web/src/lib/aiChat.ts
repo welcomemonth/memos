@@ -88,6 +88,29 @@ export async function streamMessage(
         onEvent({
           content: { delta: event.event.value.delta },
         });
+      } else if (event.event.case === "toolCallStart") {
+        onEvent({
+          toolCallStart: {
+            toolCallId: event.event.value.toolCallId,
+            name: event.event.value.name,
+          },
+        });
+      } else if (event.event.case === "toolCallDelta") {
+        onEvent({
+          toolCallDelta: {
+            toolCallId: event.event.value.toolCallId,
+            argumentsDelta: event.event.value.argumentsDelta,
+          },
+        });
+      } else if (event.event.case === "toolCallEnd") {
+        onEvent({
+          toolCallEnd: {
+            toolCallId: event.event.value.toolCallId,
+            result: event.event.value.result,
+            status: event.event.value.status === 3 ? "completed" : "failed",
+            durationMs: event.event.value.durationMs,
+          },
+        });
       } else if (event.event.case === "done") {
         onEvent({
           done: {
