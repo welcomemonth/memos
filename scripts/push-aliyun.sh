@@ -43,7 +43,15 @@ echo "Target:  ${FULL_IMAGE}:${VERSION}"
 echo "======================================"
 
 echo ""
-echo "=== [1/3] Building image ==="
+echo "=== [1/4] Building frontend ==="
+
+cd web
+pnpm install
+pnpm release
+cd ..
+
+echo ""
+echo "=== [2/4] Building Docker image ==="
 
 # 构建镜像，同时打上本地标签
 docker build \
@@ -55,14 +63,14 @@ docker build \
   .
 
 echo ""
-echo "=== [2/3] Tagging for Aliyun Registry ==="
+echo "=== [3/4] Tagging for Aliyun Registry ==="
 
 # 给镜像打上阿里云仓库的完整标签
 docker tag "${REPO}:${VERSION}" "${FULL_IMAGE}:${VERSION}"
 docker tag "${REPO}:${VERSION}" "${FULL_IMAGE}:latest"
 
 echo ""
-echo "=== [3/3] Pushing to Aliyun Registry ==="
+echo "=== [4/4] Pushing to Aliyun Registry ==="
 
 # 推送到阿里云（假设已经完成 docker login）
 docker push "${FULL_IMAGE}:${VERSION}"
