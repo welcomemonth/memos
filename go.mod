@@ -11,12 +11,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.0
 	github.com/cloudwego/eino v0.9.13
 	github.com/cloudwego/eino-ext/callbacks/cozeloop v0.3.1
+	github.com/cloudwego/eino-ext/components/document/transformer/splitter/recursive v0.0.0-20260803030130-90a15623ddb6
 	github.com/cloudwego/eino-ext/components/embedding/dashscope v0.0.0-20260724103301-c9a5dc923462
 	github.com/cloudwego/eino-ext/components/indexer/milvus v0.0.0-20260724103301-c9a5dc923462
 	github.com/cloudwego/eino-ext/components/model/ark v0.1.68
 	github.com/cloudwego/eino-ext/components/retriever/milvus v0.0.0-20260724103301-c9a5dc923462
-	github.com/cloudwego/eino-ext/components/tool/duckduckgo v0.0.0-20260803030130-90a15623ddb6
-	github.com/cloudwego/eino-ext/components/tool/googlesearch v0.0.0-20260803030130-90a15623ddb6
 	github.com/coze-dev/cozeloop-go v0.1.20
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/cel-go v0.28.0
@@ -59,7 +58,6 @@ require (
 	cel.dev/expr v0.25.1 // indirect
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/auth v0.20.0 // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
@@ -76,6 +74,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
+	github.com/cloudwego/eino-ext/components/document/transformer/splitter/semantic v0.0.0-20260803030130-90a15623ddb6 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.15 // indirect
 	github.com/cockroachdb/errors v1.9.1 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20211118104740-dabe8e521a4f // indirect
@@ -176,7 +175,7 @@ require (
 	golang.org/x/image v0.39.0 // indirect
 	google.golang.org/api v0.276.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260427160629-7cedc36a6bc4 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	modernc.org/libc v1.72.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
