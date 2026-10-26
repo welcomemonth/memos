@@ -17,6 +17,9 @@ memos
 # Docker Compose Environment File
 .env
 
+# Xiaohualu license service test private key
+xhl.key
+
 dist
 
 # VSCode settings

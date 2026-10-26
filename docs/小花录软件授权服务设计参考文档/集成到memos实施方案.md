@@ -203,9 +203,9 @@ CREATE TABLE IF NOT EXISTS license_revocations (
 
 **客服续期（`POST /admin/api/license/cards/:id/extend`）**
 
-- 请求 `{days}`（1~3650），管理端按“延长天数”操作；UI 可展示计算后的日期。
+- 请求 `{expiresAt}`（RFC3339 UTC），管理端直接设置新的绝对到期时间；UI 用日期/时间选择器。
 - 仅允许：非 `lifetime`、未撤销、已激活（`activated_at != ''`）的卡密。
-- 计算：`base = max(now, expires_at)`；`newExpiresAt = base + days*86400`；更新 `expires_at`。
+- 校验：`newExpiresAt` 必须晚于 `max(now, 当前 expires_at)`，否则 `400 bad_request`；只更新 `expires_at`。已过期卡密设置一个未来时间即可恢复。
 - 返回 `{expiresAt}`（RFC3339 UTC）。
 - 卡密当前绑定的设备在下一次 refresh 时拿到新的 `exp`；如果旧令牌已经过期，refresh 走上面的“客服续期例外”直接恢复。
 - 未激活的卡密不能延长（有效期从首次激活开始算）；如需更长有效期，创建时选择更大的 `duration_days`。
@@ -269,7 +269,7 @@ user, err := authenticator.AuthenticateToUser(ctx, authHeader, cookieHeader)
 | POST | `/cards/lookup` | `{key}` → 按规范化哈希精确匹配，返回单张卡或 404；**卡密明文只走 body** |
 | POST | `/cards` | `{plan,count,durationDays}` → `{cards:[{id,key}]}`，明文仅此一次；不生成 CSV |
 | POST | `/cards/:id/revoke` | `{status:"ok"}` |
-| POST | `/cards/:id/extend` | `{days}` → `{expiresAt}`；客服续期 |
+| POST | `/cards/:id/extend` | `{expiresAt}`（RFC3339 UTC）→ `{expiresAt}`；客服设置绝对到期时间 |
 | GET | `/cards/:id/bindings` | `{boundDeviceId, binding:{deviceId,activatedAt,lastSeenAt} \| null}` |
 | POST | `/bindings/unbind` | `{cardId, deviceId}` → 删除当前绑定、撤销 nonce、清除 `bound_device_id` → `{status:"ok"}`；**deviceId 只走 body** |
 | GET | `/update` | `{release, currentFile:{name,size}, previousFile:{name,size}\|null}`；保留当前+上一版 |
@@ -282,8 +282,8 @@ user, err := authenticator.AuthenticateToUser(ctx, authHeader, cookieHeader)
   - `active`：已激活、未撤销，且 `expires_at` 为空（lifetime）或晚于当前时间。
   - `expired`：已激活、未撤销，`expires_at` 已到。
   - `revoked`：`revoked = 1`。
-- 输入边界：`count` 1~1000，`pageSize` 1~200，`durationDays` 1~3650（`lifetime` 为 0）；`days` 1~3650；`releaseNotes` 限制长度。
-- `plan` 与 `durationDays` 必须一致：`daily=1`、`monthly=30`、`yearly=365`、`lifetime=0`；不要允许 `yearly + 30 天` 这种组合。
+- 输入边界：`count` 1~1000，`pageSize` 1~200，`durationDays` 1~3650（`lifetime` 为 0）；续期 `expiresAt` 必须晚于 `max(now, 当前 expires_at)`；`releaseNotes` 限制长度。
+- `plan` 只是标签，`durationDays` 才是权威有效期：`daily/monthly/yearly` 允许 1~3650 任意天数（UI 预填 1/30/365），`lifetime` 固定 0；不要强制 plan 与天数一一对应。
 - 创建响应只含明文卡密一次；前端展示后由管理员点击“复制全部”，**不提供 CSV**。关闭弹窗前提示“关闭后无法再次查看，只能撤销重建”。
 - 客服续期只改变 `expires_at`；`duration_days`、`plan`、`bound_device_id` 不变。UI 显示“设备将在下次刷新后看到新到期时间”。未激活、`lifetime`、已撤销的卡密拒绝延长，返回 `400 bad_request`。
 - 客服释放设备后，卡密可以绑定到新设备，但到期时间不变；如果卡密已过期，先延长再释放/激活。
@@ -395,7 +395,7 @@ curl localhost:8081/xiaohualu/v1/update/windows.json
 - 同一张卡换设备：`409 device_limit`。
 - 客户端 `deactivate` 后：同设备可重新激活且 `exp` 不变；另一台设备仍 `409 device_limit`。
 - 管理端释放设备后：新设备可以激活，`exp` 仍是原到期时间。
-- 管理端延长 `days` 后：已绑定设备下一次 refresh 返回更晚的 `exp`；旧令牌已过期也能通过 refresh 恢复。
+- 管理端把 `expiresAt` 设置到更晚时间后：已绑定设备下一次 refresh 返回更晚的 `exp`；旧令牌已过期也能通过 refresh 恢复。
 - 未激活卡密不能延长；lifetime 卡密不能延长。
 - 更新包：连续上传两个版本，保留当前+上一版；非法版本号被拒；`windows.json` 的 sha256 与 `sha256sum` 一致。
 - 管理端查找/延长/释放请求的 URL 中不出现明文卡密/deviceId。
@@ -481,7 +481,7 @@ type Service struct { repo *Repo; signer *Signer; now func() time.Time }
 func (s *Service) Activate(ctx context.Context, req ActivateRequest) (*ActivateResponse, error)
 func (s *Service) Refresh(ctx context.Context, req RefreshRequest) (*RefreshResponse, error)
 func (s *Service) Deactivate(ctx context.Context, req DeactivateRequest) error
-func (s *Service) Extend(ctx context.Context, cardID string, days int) (string, error) // 返回新 expiresAt
+func (s *Service) Extend(ctx context.Context, cardID string, newExpiresAt time.Time) (string, error) // 返回新 expiresAt
 func (s *Service) Release(ctx context.Context, cardID, deviceID string) error
 
 // repo.go
@@ -631,7 +631,7 @@ func (s *AdminService) RegisterRoutes(e *echo.Echo)
 - 实现：
   - group 中间件 `requireAdmin`：`AuthenticateToUser` → nil 401 → `Role != store.RoleAdmin` 403；不要用 JWT `claims.Role`
   - 列表/状态筛选；`POST /cards/lookup`（卡密走 body）；创建批次事务（无 CSV）；撤销；`POST /cards/:id/extend`；绑定列表；`POST /bindings/unbind`（deviceId 走 body，删绑定 + 撤销 nonce + 清 `bound_device_id`）
-  - 输入边界：`count`、`pageSize`、`durationDays`、`days`、`releaseNotes`；`plan` 与 `durationDays` 一致
+  - 输入边界：`count`、`pageSize`、`durationDays`、续期 `expiresAt`、`releaseNotes`；`durationDays` 1~3650（lifetime 0），plan 只是标签
   - 上传：`ParseMultipartForm` + 字段校验 + `UpdateStore.Save`
 - 验收：
   - 匿名 401、普通用户 403、admin 200
@@ -690,7 +690,7 @@ func (s *AdminService) RegisterRoutes(e *echo.Echo)
   5. `/xiaohualu/v1/deactivate` 后同设备重新 activate：成功且 `exp` 不变
   6. 解绑后另一台设备 activate：仍 `409 device_limit`
   7. 管理端释放设备 → 新设备 activate：成功，`exp` 不变
-  8. 管理端延长 `days` → 已绑定设备 refresh：返回新 `exp`；构造已过期令牌再 refresh：恢复
+  8. 管理端设置更晚的 `expiresAt` → 已绑定设备 refresh：返回新 `exp`；构造已过期令牌再 refresh：恢复
   9. `/xiaohualu/v1/refresh`：正常刷新 `exp` 不变、`nonce` 变化
   10. 上传两个版本：保留当前+上一版；非法版本号被拒
   11. 连续请求触发 429
@@ -736,6 +736,8 @@ func (s *AdminService) RegisterRoutes(e *echo.Echo)
 ---
 
 ## 13. 剩余待确认项（不阻塞 T1）
+
+> T01（2026-10-26）已根据下面的确认结果定稿，具体实现口径见 §15；第 3、5 项的实际落地方式也在 §15 中说明。
 
 1. **`durationDays` 与 `plan` 的关系**：当前要求一致（daily=1/monthly=30/yearly=365/lifetime=0）。如果需要任意天数（例如 7 天、90 天），需要扩展契约的 plan 取值或允许“自定义套餐”。
 
@@ -787,3 +789,12 @@ func (s *AdminService) RegisterRoutes(e *echo.Echo)
 - **更新包**：保留当前版 + 上一版。
 - **部署**：明确单实例、单密钥，不考虑多副本和密钥轮换。
 - **移除**：`max_devices`、按绝对日期创建、CSV 导出、自动续费换卡、旧版“多设备共享 term”设计。
+
+## 15. T01 口径定稿（2026-10-26）
+
+T01 在 §13 已确认项的基础上，解决了两处与旧描述的冲突，并把参数落到 `internal/license/constants.go`：
+
+- **`durationDays` 与 `plan`**：`duration_days` 是权威有效期，`plan` 只是标签。`daily/monthly/yearly` 允许 1~3650 任意天数（UI 预填 1/30/365），`lifetime` 固定 0；创建接口不再强制 plan 与天数一一对应。
+- **客服续期输入**：从“延长 N 天”改为绝对到期时间 `{expiresAt}`（RFC3339 UTC）；新值必须晚于 `max(now, 当前 expires_at)`，只更新 `expires_at`。已过期卡密设置未来时间即可恢复。
+- **客户端解绑**：客户端没有解绑 UI；契约保留 `/v1/deactivate` 端点，实际换机走管理端“释放设备”。
+- **其余确认项不变**：严格一对一、首次激活锁定到期、未激活卡密不过期、过期令牌 + 已延长卡密可 refresh 恢复、更新包保留当前+上一版、`XHL_UPDATE_BASE_URL` 包含 `/xiaohualu`。
